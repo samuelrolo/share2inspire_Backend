@@ -1,0 +1,20 @@
+runtime: python311  # Ou a versão do Python que o seu backend usa (ex: python310, python39)
+entrypoint: gunicorn -b :$PORT --workers 1 --threads 8 --timeout 0 "src.main:create_app()" # Ajuste se necessário
+
+# Se precisar de definir variáveis de ambiente diretamente aqui (alternativa a defini-las na consola GCP):
+# env_variables:
+#   FLASK_ENV: "production"
+#   FLASK_DEBUG: "False"
+#   # IFTHENPAY_GATEWAY_KEY: "SUA_CHAVE_AQUI" # É MELHOR DEFINIR CHAVES SENSÍVEIS NA CONSOLA
+#   # BREVO_API_KEY: "SUA_CHAVE_AQUI"
+#   # ... e outras
+
+handlers:
+# Esta configuração serve todos os pedidos para a sua aplicação Flask.
+- url: /.*
+  script: auto
+  secure: always # Força HTTPS
+
+# Se tiver ficheiros estáticos que o App Engine deva servir (improvável para um backend API puro)
+# - url: /static
+#   static_dir: static
