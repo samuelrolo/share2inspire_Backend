@@ -20,3 +20,9 @@ __pycache__/
 # Outros (pode adicionar mais conforme necessário)
 .DS_Store
 *.log
+
+# .gitignore
+.env
+venv/
+__pycache__/
+*.pyc
