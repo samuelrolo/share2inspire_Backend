@@ -77,7 +77,7 @@ def initiate_payment():
                     "expiryDate": payment_data.get("ExpiryDate") # Verificar nome do campo na doc
                 }), 200
             else:
-                return jsonify({"erro": f"Erro ao gerar referência Multibanco: {payment_data.get('Message', 'Erro desconhecido')}"}), 500
+return jsonify({"erro": f"Erro ao gerar referência Multibanco: {payment_data.get('Message', 'Erro desconhecido')}"}), 500
 
         elif payment_method == "mbway":
              # 1. Verificar se a chave MBWAY está configurada
