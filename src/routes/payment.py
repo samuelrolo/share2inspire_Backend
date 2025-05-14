@@ -123,7 +123,7 @@ def initiate_payment():
                     "expiryDate": payment_data.get("ExpiryDate") # Verificar nome do campo
                 }), 200
             else:
-              return jsonify({"erro": f"Erro ao gerar referência Multibanco: {payment_data.get('Message', 'Erro desconhecido')}"}), 500
+                return jsonify({"erro": f"Erro ao gerar referência Payshop: {payment_data.get('Message', 'Erro desconhecido')}"}), 500
 
         else:
             # Incluir aqui lógica para "revolut" e "bank-transfer" se forem processados pelo backend
