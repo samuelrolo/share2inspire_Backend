@@ -5,11 +5,7 @@ import requests
 import hmac
 import hashlib
 from flask import Blueprint, request, jsonify
-import re
 from dotenv import load_dotenv
-
-# Constants
-MBWAY_DESCRIPTION_FORMAT = "Pagamento Share2Inspire {order_id}"
 
 # Importar função de envio de email (assumindo que será refatorada ou importada)
 # from ..utils.email import send_brevo_email # Exemplo de importação futura
@@ -27,12 +23,6 @@ IFTHENPAY_CALLBACK_KEY = os.getenv("IFTHENPAY_CALLBACK_KEY") # Chave para valida
 
 # URL base da API Ifthenpay (verificar documentação se existe ambiente de teste)
 IFTHENPAY_API_URL = "https://ifthenpay.com/api/" # Exemplo, confirmar URL correta
-
-# Utility function to validate phone number format
-def is_valid_phone_number(phone_number):
-    # Example regex for validating phone numbers (adjust as needed)
-    phone_regex = r"^\+?[1-9]\d{1,14}$"
-    return re.match(phone_regex, phone_number) is not None
 
 # --- Endpoint para Iniciar Pagamento --- #
 @payment_bp.route("/initiate", methods=["POST"])
@@ -77,35 +67,29 @@ def initiate_payment():
                     "expiryDate": payment_data.get("ExpiryDate") # Verificar nome do campo na doc
                 }), 200
             else:
-return jsonify({"erro": f"Erro ao gerar referência Multibanco: {payment_data.get('Message', 'Erro desconhecido')}"}), 500
-
+                error_message = payment_data.get("Message", "Erro desconhecido")
+                return jsonify({"erro": f"Erro ao gerar referência Multibanco: {error_message}"}), 500
         elif payment_method == "mbway":
-             # 1. Verificar se a chave MBWAY está configurada
             if not IFTHENPAY_MBWAY_KEY:
                 return jsonify({"erro": "Chave MB WAY não configurada no servidor."}), 500
-            # 2. Validar o número de telemóvel
-            if not customer_phone or not is_valid_phone_number(customer_phone):
-                 return jsonify({"erro": "Número de telemóvel é obrigatório e deve ser válido para MB WAY."}), 400
-             # 3. Preparar o payload específico para MBWAY
+            if not customer_phone:
+                 return jsonify({"erro": "Número de telemóvel é obrigatório para MB WAY."}), 400
             payload["mbwayKey"] = IFTHENPAY_MBWAY_KEY
-            payload["phone_number"] = str(customer_phone) # Garante que é string
-            payload["description"] = MBWAY_DESCRIPTION_FORMAT.format(order_id=order_id)
-            # 4. Fazer a chamada à API (uma única vez com o payload completo)
-            # Confirme o endpoint exato na documentação da Ifthenpay
-            response = requests.post(f"{IFTHENPAY_API_URL}mbway/request", json=payload, headers=headers)
-            response.raise_for_status() # Lança erro para códigos HTTP >= 400
+            payload["phone_number"] = str(customer_phone)
+            payload["description"] = f"Pagamento Share2Inspire {order_id}" # Exemplo
+            response = requests.post(f"{IFTHENPAY_API_URL}mbway/request", json=payload, headers=headers) # Confirmar endpoint
+            response.raise_for_status()
             payment_data = response.json()
-            # 5. Processar a resposta
-            if payment_data.get("Status") == "0": # Verificar código de sucesso na documentação
+            if payment_data.get("Status") == "0":
                 return jsonify({
                     "message": "Pedido de pagamento MB WAY iniciado com sucesso. Aguarde confirmação na app.",
                     "method": "mbway",
                     "requestId": payment_data.get("RequestId") # ID do pedido MBWAY
                 }), 200
             else:
-                # Use aspas simples dentro da f-string para o .get() se a f-string usa aspas duplas
-                return jsonify({"erro": f"Erro ao iniciar pagamento MB WAY: {payment_data.get('Message', 'Erro desconhecido')}"}), 500
-     
+                error_message_mbway = payment_data.get("Message", "Erro desconhecido")
+                return jsonify({"erro": f"Erro ao iniciar pagamento MB WAY: {error_message_mbway}"}), 500
+
         elif payment_method == "payshop":
             if not IFTHENPAY_PAYSHOP_KEY:
                 return jsonify({"erro": "Chave Payshop não configurada no servidor."}), 500
@@ -123,7 +107,8 @@ return jsonify({"erro": f"Erro ao gerar referência Multibanco: {payment_data.ge
                     "expiryDate": payment_data.get("ExpiryDate") # Verificar nome do campo
                 }), 200
             else:
-                return jsonify({"erro": f"Erro ao gerar referência Payshop: {payment_data.get('Message', 'Erro desconhecido')}"}), 500
+                error_message_payshop = payment_data.get("Message", "Erro desconhecido")
+                return jsonify({"erro": f"Erro ao gerar referência Payshop: {error_message_payshop}"}), 500
 
         else:
             # Incluir aqui lógica para "revolut" e "bank-transfer" se forem processados pelo backend
