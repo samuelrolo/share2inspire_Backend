@@ -1,20 +1,21 @@
-runtime: python311  # Ou a versão do Python que o seu backend usa (ex: python310, python39)
-entrypoint: gunicorn -b :$PORT --workers 1 --threads 8 --timeout 0 "src.main:create_app()" # Ajuste se necessário
+runtime: python311
+entrypoint: gunicorn -b :$PORT --workers 1 --threads 8 --timeout 0 main:app
 
-# Se precisar de definir variáveis de ambiente diretamente aqui (alternativa a defini-las na consola GCP):
-# env_variables:
-#   FLASK_ENV: "production"
-#   FLASK_DEBUG: "False"
-#   # IFTHENPAY_GATEWAY_KEY: "SUA_CHAVE_AQUI" # É MELHOR DEFINIR CHAVES SENSÍVEIS NA CONSOLA
-#   # BREVO_API_KEY: "SUA_CHAVE_AQUI"
-#   # ... e outras
+# Variáveis de ambiente para substituir o Secret Manager
+env_variables:
+  FLASK_ENV: "production"
+  FLASK_DEBUG: "False"
+  BREVO_API_KEY: "P1g7Ax"
+  IFTHENPAY_GATEWAY_KEY: "3532-9893-7426-5310"
+  IFTHENPAY_CALLBACK_KEY: "3532-9893-7426-5310"  # Chave Backoffice
+  IFTHENPAY_MBWAY_KEY: "UWP-547025"  # MBWAY Key
+  IFTHENPAY_PAYSHOP_KEY: "QTU-066969"  # PAYSHOP Key
+  IFTHENPAY_MB_KEY: "BXG-350883"  # MB Key
+  FLASK_SECRET_KEY: "6BgB0lORveVCA/bsnK3XddCBnxvN3+Q8Z8We7cBeWAQ="
+  ANTI_PHISHING_KEY: "SUbOv6HYq8WVAmSEqkLKZvjAhBPsr1LI9ifRXTtrvMs="  # Chave ANTI_PHISHING fornecida
 
 handlers:
 # Esta configuração serve todos os pedidos para a sua aplicação Flask.
 - url: /.*
   script: auto
   secure: always # Força HTTPS
-
-# Se tiver ficheiros estáticos que o App Engine deva servir (improvável para um backend API puro)
-# - url: /static
-#   static_dir: static
