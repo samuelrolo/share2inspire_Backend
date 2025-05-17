@@ -28,9 +28,10 @@ except ImportError:
 
 # Import Blueprints
 # from src.models.user import db # Database not used yet
-# from src.routes.user import user_bp # Default user blueprint not used yet
+#from src.routes.user import user_bp
 from src.routes.feedback import feedback_bp
 from src.routes.payment import payment_bp # Assegure-se que este import está correto e o ficheiro existe
+from src.routes.booking import booking_bp
 
 # Carregar variáveis de ambiente do ficheiro .env (para desenvolvimento local)
 load_dotenv()
@@ -119,9 +120,10 @@ def create_app():
         app.config['SECRET_KEY'] = 'temp_secret_key_insecure_for_production_only'
 
     # Registar os blueprints
-    # app.register_blueprint(user_bp, url_prefix='/api') # Manter comentado se não for usado
+    app.register_blueprint(user_bp, url_prefix='/api')
     app.register_blueprint(feedback_bp)
     app.register_blueprint(payment_bp)
+    app.register_blueprint(booking_bp)
 
     # Rota para servir ficheiros estáticos (ex: frontend se integrado) ou index.html
     @app.route('/', defaults={'path': ''})
