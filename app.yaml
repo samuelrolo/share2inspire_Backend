@@ -12,11 +12,7 @@ env_variables:
   IFTHENPAY_MB_KEY: "BXG-350883"  # MB Key
   FLASK_SECRET_KEY: "6BgB0lORveVCA/bsnK3XddCBnxvN3+Q8Z8We7cBeWAQ="
   ANTI_PHISHING_KEY: "SUbOv6HYq8WVAmSEqkLKZvjAhBPsr1LI9ifRXTtrvMs="  # Chave ANTI_PHISHING fornecida
-  IFTHENPAY_MB_KEY: "test_key_mb"
-  IFTHENPAY_MBWAY_KEY: "test_key_mbway"
-  IFTHENPAY_PAYSHOP_KEY: "test_key_payshop"
   IFTHENPAY_CALLBACK_KEY: "test_key_callback"
-  ANTI_PHISHING_KEY: "test_key_phishing"
 
 handlers:
 # Esta configuração serve todos os pedidos para a sua aplicação Flask.
