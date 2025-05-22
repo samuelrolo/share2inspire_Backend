@@ -1,215 +1,375 @@
-# /home/ubuntu/share2inspire_backend/src/routes/payment.py
+# /home/ubuntu/share2inspire_Backend/src/payment.py
 
 import os
+import json
+import uuid
+import logging
 import requests
-import hmac
-import hashlib
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
+from flask_cors import cross_origin
 from dotenv import load_dotenv
 
-# Importar função de envio de email (assumindo que será refatorada ou importada)
-# from ..utils.email import send_brevo_email # Exemplo de importação futura
+# Configurar logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Carregar variáveis de ambiente
 load_dotenv()
 
 payment_bp = Blueprint("payment", __name__, url_prefix="/api/payment")
 
-# Chaves Ifthenpay (lidas do ambiente)
-IFTHENPAY_MB_KEY = os.getenv("IFTHENPAY_MB_KEY")
+# Configurações Ifthenpay
+IFTHENPAY_API_KEY = os.getenv("IFTHENPAY_API_KEY")
 IFTHENPAY_MBWAY_KEY = os.getenv("IFTHENPAY_MBWAY_KEY")
+IFTHENPAY_MULTIBANCO_ENTITY = os.getenv("IFTHENPAY_MULTIBANCO_ENTITY")
+IFTHENPAY_MULTIBANCO_SUBENTITY = os.getenv("IFTHENPAY_MULTIBANCO_SUBENTITY")
 IFTHENPAY_PAYSHOP_KEY = os.getenv("IFTHENPAY_PAYSHOP_KEY")
-IFTHENPAY_CALLBACK_KEY = os.getenv("IFTHENPAY_CALLBACK_KEY") # Chave para validar callbacks
+IFTHENPAY_CALLBACK_SECRET = os.getenv("IFTHENPAY_CALLBACK_SECRET")
+IFTHENPAY_CALLBACK_URL = os.getenv("IFTHENPAY_CALLBACK_URL", "https://share2inspire.pt/api/payment/callback" )
 
-# URL base da API Ifthenpay (verificar documentação se existe ambiente de teste)
-IFTHENPAY_API_URL = "https://ifthenpay.com/api/" # Exemplo, confirmar URL correta
+# Verificar configurações
+if not all([IFTHENPAY_API_KEY, IFTHENPAY_MULTIBANCO_ENTITY, IFTHENPAY_MULTIBANCO_SUBENTITY]):
+    logger.error("Configurações Ifthenpay incompletas. Verifique as variáveis de ambiente.")
 
-# --- Endpoint para Iniciar Pagamento --- #
-@payment_bp.route("/initiate", methods=["POST"])
+# URLs da API Ifthenpay
+IFTHENPAY_BASE_URL = "https://ifthenpay.com/api/v1"
+IFTHENPAY_MULTIBANCO_URL = f"{IFTHENPAY_BASE_URL}/multibanco/reference"
+IFTHENPAY_MBWAY_URL = f"{IFTHENPAY_BASE_URL}/mbway/payment"
+IFTHENPAY_PAYSHOP_URL = f"{IFTHENPAY_BASE_URL}/payshop/reference"
+
+@payment_bp.route("/initiate", methods=["POST"] )
+@cross_origin()
 def initiate_payment():
-    data = request.get_json()
-    if not data:
-        return jsonify({"erro": "Nenhum dado recebido"}), 400
-
-    payment_method = data.get("paymentMethod")
-    order_id = data.get("orderId") # ID único da sua encomenda/agendamento
-    amount = data.get("amount")
-    customer_name = data.get("customerName")
-    customer_email = data.get("customerEmail")
-    customer_phone = data.get("customerPhone") # Necessário para MBWAY
-
-    if not all([payment_method, order_id, amount]):
-        return jsonify({"erro": "Dados insuficientes para iniciar pagamento (método, ID da encomenda, valor)"}), 400
-
-    headers = {"Content-Type": "application/json"}
-    payload = {
-        "order_id": str(order_id),
-        "amount": str(amount),
-        # Adicionar mais detalhes se a API Ifthenpay permitir/exigir
-    }
-
+    """
+    Inicia um novo pagamento com base no método selecionado.
+    Métodos suportados: mb (Multibanco), mbway (MB WAY), payshop (Payshop)
+    """
     try:
-        if payment_method == "mb":
-            if not IFTHENPAY_MB_KEY:
-                return jsonify({"erro": "Chave Multibanco não configurada no servidor."}), 500
-            payload["mbKey"] = IFTHENPAY_MB_KEY
-            # Adicionar validade se necessário: payload["expiry_days"] = "3"
-            response = requests.post(f"{IFTHENPAY_API_URL}multibanco/references/init", json=payload, headers=headers)
-            response.raise_for_status() # Lança erro para códigos HTTP >= 400
-            payment_data = response.json()
-            if payment_data.get("Status") == "0": # Verificar código de sucesso na doc
-                return jsonify({
-                    "message": "Referência Multibanco gerada com sucesso.",
-                    "method": "mb",
-                    "entity": payment_data.get("Entity"),
-                    "reference": payment_data.get("Reference"),
-                    "amount": payment_data.get("Amount"),
-                    "expiryDate": payment_data.get("ExpiryDate") # Verificar nome do campo na doc
-                }), 200
-            else:
-                error_message = payment_data.get("Message", "Erro desconhecido")
-                return jsonify({"erro": f"Erro ao gerar referência Multibanco: {error_message}"}), 500
-        elif payment_method == "mbway":
-            if not IFTHENPAY_MBWAY_KEY:
-                return jsonify({"erro": "Chave MB WAY não configurada no servidor."}), 500
-            if not customer_phone:
-                 return jsonify({"erro": "Número de telemóvel é obrigatório para MB WAY."}), 400
-            payload["mbwayKey"] = IFTHENPAY_MBWAY_KEY
-            payload["phone_number"] = str(customer_phone)
-            payload["description"] = f"Pagamento Share2Inspire {order_id}" # Exemplo
-            response = requests.post(f"{IFTHENPAY_API_URL}mbway/request", json=payload, headers=headers) # Confirmar endpoint
-            response.raise_for_status()
-            payment_data = response.json()
-            if payment_data.get("Status") == "0":
-                return jsonify({
-                    "message": "Pedido de pagamento MB WAY iniciado com sucesso. Aguarde confirmação na app.",
-                    "method": "mbway",
-                    "requestId": payment_data.get("RequestId") # ID do pedido MBWAY
-                }), 200
-            else:
-                error_message_mbway = payment_data.get("Message", "Erro desconhecido")
-                return jsonify({"erro": f"Erro ao iniciar pagamento MB WAY: {error_message_mbway}"}), 500
-
-        elif payment_method == "payshop":
-            if not IFTHENPAY_PAYSHOP_KEY:
-                return jsonify({"erro": "Chave Payshop não configurada no servidor."}), 500
-            payload["payshopKey"] = IFTHENPAY_PAYSHOP_KEY
-            # Adicionar validade se necessário: payload["validade"] = "3"
-            response = requests.post(f"{IFTHENPAY_API_URL}payshop/references/init", json=payload, headers=headers) # Confirmar endpoint
-            response.raise_for_status()
-            payment_data = response.json()
-            if payment_data.get("Status") == "0":
-                return jsonify({
-                    "message": "Referência Payshop gerada com sucesso.",
-                    "method": "payshop",
-                    "reference": payment_data.get("Reference"),
-                    "amount": payment_data.get("Amount"),
-                    "expiryDate": payment_data.get("ExpiryDate") # Verificar nome do campo
-                }), 200
-            else:
-                error_message_payshop = payment_data.get("Message", "Erro desconhecido")
-                return jsonify({"erro": f"Erro ao gerar referência Payshop: {error_message_payshop}"}), 500
-
-        else:
-            # Incluir aqui lógica para "revolut" e "bank-transfer" se forem processados pelo backend
-            # Caso contrário, são tratados no frontend como instruções
-            return jsonify({"erro": "Método de pagamento não suportado ou inválido"}), 400
-
-    except requests.exceptions.RequestException as e:
-        print(f"Erro de comunicação com a API Ifthenpay: {e}")
-        return jsonify({"erro": "Não foi possível comunicar com o sistema de pagamentos. Tente novamente mais tarde."}), 503
-    except Exception as e:
-        print(f"Erro inesperado ao iniciar pagamento: {e}")
-        return jsonify({"erro": "Ocorreu um erro inesperado no servidor."}), 500
-
-# --- Endpoint para Callback Ifthenpay --- #
-# NOTA: A Ifthenpay pode usar método GET com parâmetros na URL.
-# É CRUCIAL verificar a documentação para o formato exato e método (GET/POST).
-@payment_bp.route("/callback", methods=["GET", "POST"]) # Ajustar métodos conforme documentação
-def payment_callback():
-    print("Callback Ifthenpay recebido!")
-
-    # 1. Obter dados (ajustar se for GET - request.args)
-    if request.method == "POST":
         data = request.get_json()
-        print("Dados Callback (POST):", data)
-    else: # GET
-        data = request.args
-        print("Dados Callback (GET):", data)
+        logger.info(f"Dados de pagamento recebidos: {json.dumps(data, indent=2)}")
 
-    if not data:
-        print("Callback Ifthenpay: Nenhum dado recebido.")
-        return jsonify({"erro": "Nenhum dado recebido"}), 400
+        if not data:
+            logger.warning("Nenhum dado recebido no corpo da requisição")
+            return jsonify({"error": "Nenhum dado recebido", "success": False}), 400
 
-    # 2. Validar a origem do Callback (MUITO IMPORTANTE!)
-    # A Ifthenpay geralmente envia uma chave ou assinatura para validar.
-    # Exemplo hipotético usando uma chave partilhada (VERIFICAR DOCUMENTAÇÃO!)
-    chave_recebida = data.get("chave") # Nome do parâmetro/campo da chave na doc
-    if not IFTHENPAY_CALLBACK_KEY or not chave_recebida or chave_recebida != IFTHENPAY_CALLBACK_KEY:
-        print("Callback Ifthenpay: Chave de validação inválida ou em falta!")
-        # Não retornar erro detalhado para evitar dar pistas a atacantes
-        return jsonify({"erro": "Pedido inválido"}), 403 # Forbidden
+        # Validação de campos obrigatórios
+        required_fields = ["paymentMethod", "amount", "orderId"]
+        missing_fields = [field for field in required_fields if not data.get(field)]
+        
+        if missing_fields:
+            logger.warning(f"Campos obrigatórios em falta: {', '.join(missing_fields)}")
+            return jsonify({
+                "error": f"Campos obrigatórios em falta: {', '.join(missing_fields)}",
+                "success": False
+            }), 400
 
-    # 3. Processar os dados do callback
-    order_id = data.get("order_id") # Ou o nome do campo que identifica a encomenda
-    payment_status = data.get("status") # Ou o nome do campo do estado
-    amount_paid = data.get("valor") # Ou o nome do campo do valor
-    payment_method_used = data.get("metodo") # Ou o nome do campo do método
-    # ... outros campos relevantes
+        payment_method = data.get("paymentMethod", "mb").lower()
+        amount = float(data.get("amount", 0))
+        order_id = data.get("orderId", f"ORDER_{uuid.uuid4().hex[:8]}")
+        
+        # Validar valor
+        if amount <= 0:
+            logger.warning(f"Valor inválido: {amount}")
+            return jsonify({"error": "Valor de pagamento inválido", "success": False}), 400
 
-    if not order_id or not payment_status:
-        print("Callback Ifthenpay: Dados essenciais em falta (ID encomenda, estado)")
-        return jsonify({"erro": "Dados incompletos"}), 400
+        # Processar pagamento com base no método
+        if payment_method == "mb" or payment_method == "multibanco":
+            return create_multibanco_reference(data, amount, order_id)
+        elif payment_method == "mbway":
+            return create_mbway_payment(data, amount, order_id)
+        elif payment_method == "payshop":
+            return create_payshop_reference(data, amount, order_id)
+        else:
+            logger.warning(f"Método de pagamento não suportado: {payment_method}")
+            return jsonify({"error": "Método de pagamento não suportado", "success": False}), 400
+            
+    except Exception as e:
+        logger.exception(f"Erro ao iniciar pagamento: {str(e)}")
+        return jsonify({"error": "Erro ao processar pagamento", "success": False}), 500
 
-    # 4. Lógica de Negócio Pós-Pagamento
-    if payment_status == "PAGO": # Verificar valor exato do estado na doc
-        print(f"Pagamento confirmado para encomenda {order_id}, Valor: {amount_paid}, Método: {payment_method_used}")
+def create_multibanco_reference(data, amount, order_id):
+    """
+    Cria uma referência Multibanco para pagamento
+    """
+    try:
+        # Preparar dados para API Ifthenpay
+        payload = {
+            "entity": IFTHENPAY_MULTIBANCO_ENTITY,
+            "subEntity": IFTHENPAY_MULTIBANCO_SUBENTITY,
+            "amount": amount,
+            "orderId": order_id,
+            "description": data.get("description", f"Pagamento Share2Inspire #{order_id}"),
+            "callbackUrl": IFTHENPAY_CALLBACK_URL
+        }
+        
+        # Adicionar chave anti-phishing se disponível
+        if IFTHENPAY_CALLBACK_SECRET:
+            payload["callbackSecret"] = IFTHENPAY_CALLBACK_SECRET
+        
+        # Enviar requisição para API Ifthenpay
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {IFTHENPAY_API_KEY}"
+        }
+        
+        logger.info(f"Enviando requisição para criar referência Multibanco: {json.dumps(payload, indent=2)}")
+        response = requests.post(IFTHENPAY_MULTIBANCO_URL, json=payload, headers=headers)
+        
+        # Processar resposta
+        if response.status_code == 200:
+            result = response.json()
+            logger.info(f"Referência Multibanco criada com sucesso: {json.dumps(result, indent=2)}")
+            
+            # Salvar dados do pagamento (em produção, salvar em banco de dados)
+            # save_payment_data(order_id, "multibanco", amount, result)
+            
+            return jsonify({
+                "success": True,
+                "method": "mb",
+                "entity": result.get("entity"),
+                "reference": result.get("reference"),
+                "amount": amount,
+                "orderId": order_id
+            }), 200
+        else:
+            logger.error(f"Erro ao criar referência Multibanco: {response.status_code} - {response.text}")
+            return jsonify({
+                "error": "Erro ao gerar referência Multibanco",
+                "details": response.text,
+                "success": False
+            }), response.status_code
+            
+    except Exception as e:
+        logger.exception(f"Erro ao criar referência Multibanco: {str(e)}")
+        return jsonify({"error": "Erro ao gerar referência Multibanco", "success": False}), 500
 
-        # TODO: Adicionar lógica para marcar a encomenda/agendamento como paga na sua base de dados (se aplicável)
+def create_mbway_payment(data, amount, order_id):
+    """
+    Cria um pagamento MB WAY
+    """
+    try:
+        # Validar número de telefone
+        phone = data.get("customerPhone")
+        if not phone or not phone.isdigit() or len(phone) < 9:
+            logger.warning(f"Número de telefone inválido para MB WAY: {phone}")
+            return jsonify({"error": "Número de telefone inválido para MB WAY", "success": False}), 400
+        
+        # Formatar telefone (remover prefixo +351 se existir)
+        if phone.startswith("+351"):
+            phone = phone[4:]
+        elif phone.startswith("00351"):
+            phone = phone[5:]
+        
+        # Preparar dados para API Ifthenpay
+        payload = {
+            "mbwayKey": IFTHENPAY_MBWAY_KEY,
+            "amount": amount,
+            "phone": phone,
+            "orderId": order_id,
+            "description": data.get("description", f"Pagamento Share2Inspire #{order_id}"),
+            "callbackUrl": IFTHENPAY_CALLBACK_URL
+        }
+        
+        # Adicionar chave anti-phishing se disponível
+        if IFTHENPAY_CALLBACK_SECRET:
+            payload["callbackSecret"] = IFTHENPAY_CALLBACK_SECRET
+        
+        # Enviar requisição para API Ifthenpay
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {IFTHENPAY_API_KEY}"
+        }
+        
+        logger.info(f"Enviando requisição para criar pagamento MB WAY: {json.dumps(payload, indent=2)}")
+        response = requests.post(IFTHENPAY_MBWAY_URL, json=payload, headers=headers)
+        
+        # Processar resposta
+        if response.status_code == 200:
+            result = response.json()
+            logger.info(f"Pagamento MB WAY criado com sucesso: {json.dumps(result, indent=2)}")
+            
+            # Salvar dados do pagamento (em produção, salvar em banco de dados)
+            # save_payment_data(order_id, "mbway", amount, result)
+            
+            return jsonify({
+                "success": True,
+                "method": "mbway",
+                "reference": result.get("referenceId"),
+                "amount": amount,
+                "orderId": order_id,
+                "phone": phone
+            }), 200
+        else:
+            logger.error(f"Erro ao criar pagamento MB WAY: {response.status_code} - {response.text}")
+            return jsonify({
+                "error": "Erro ao gerar pagamento MB WAY",
+                "details": response.text,
+                "success": False
+            }), response.status_code
+            
+    except Exception as e:
+        logger.exception(f"Erro ao criar pagamento MB WAY: {str(e)}")
+        return jsonify({"error": "Erro ao gerar pagamento MB WAY", "success": False}), 500
 
-        # Enviar email de confirmação para o admin (srshare2inspire@gmail.com)
-        try:
-            # Obter detalhes do cliente (email, nome) associados ao order_id (pode precisar de DB)
-            customer_email_placeholder = "email_cliente@exemplo.com" # Substituir por email real
-            customer_name_placeholder = "Nome Cliente" # Substituir por nome real
-            booking_details_placeholder = f"Detalhes do agendamento para {order_id}" # Obter detalhes reais
+def create_payshop_reference(data, amount, order_id):
+    """
+    Cria uma referência Payshop para pagamento
+    """
+    try:
+        # Preparar dados para API Ifthenpay
+        payload = {
+            "payshopKey": IFTHENPAY_PAYSHOP_KEY,
+            "amount": amount,
+            "orderId": order_id,
+            "description": data.get("description", f"Pagamento Share2Inspire #{order_id}"),
+            "callbackUrl": IFTHENPAY_CALLBACK_URL,
+            # Validade padrão de 5 dias (em segundos)
+            "validDays": data.get("validDays", 5)
+        }
+        
+        # Adicionar chave anti-phishing se disponível
+        if IFTHENPAY_CALLBACK_SECRET:
+            payload["callbackSecret"] = IFTHENPAY_CALLBACK_SECRET
+        
+        # Enviar requisição para API Ifthenpay
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {IFTHENPAY_API_KEY}"
+        }
+        
+        logger.info(f"Enviando requisição para criar referência Payshop: {json.dumps(payload, indent=2)}")
+        response = requests.post(IFTHENPAY_PAYSHOP_URL, json=payload, headers=headers)
+        
+        # Processar resposta
+        if response.status_code == 200:
+            result = response.json()
+            logger.info(f"Referência Payshop criada com sucesso: {json.dumps(result, indent=2)}")
+            
+            # Salvar dados do pagamento (em produção, salvar em banco de dados)
+            # save_payment_data(order_id, "payshop", amount, result)
+            
+            return jsonify({
+                "success": True,
+                "method": "payshop",
+                "reference": result.get("reference"),
+                "amount": amount,
+                "orderId": order_id,
+                "validity": result.get("expirationDate")
+            }), 200
+        else:
+            logger.error(f"Erro ao criar referência Payshop: {response.status_code} - {response.text}")
+            return jsonify({
+                "error": "Erro ao gerar referência Payshop",
+                "details": response.text,
+                "success": False
+            }), response.status_code
+            
+    except Exception as e:
+        logger.exception(f"Erro ao criar referência Payshop: {str(e)}")
+        return jsonify({"error": "Erro ao gerar referência Payshop", "success": False}), 500
 
-            # Usar a função de envio de email (refatorada)
-            # send_brevo_email(
-            #     to_email="srshare2inspire@gmail.com",
-            #     to_name="Share2Inspire Admin",
-            #     subject=f"Confirmação de Pagamento - Encomenda {order_id}",
-            #     html_content=f"<p>Pagamento confirmado para a encomenda {order_id}.</p><p>Valor: {amount_paid}</p><p>Método: {payment_method_used}</p><p>Cliente: {customer_name_placeholder} ({customer_email_placeholder})</p><p>Detalhes: {booking_details_placeholder}</p>"
-            # )
-            print(f"SUCESSO: Email de confirmação para admin (encomenda {order_id}) seria enviado aqui.")
+@payment_bp.route("/callback", methods=["POST"])
+@cross_origin()
+def payment_callback():
+    """
+    Endpoint para receber callbacks de pagamento da Ifthenpay
+    """
+    try:
+        data = request.get_json()
+        logger.info(f"Callback de pagamento recebido: {json.dumps(data, indent=2)}")
 
-            # Opcional: Enviar email de confirmação para o cliente
-            # send_brevo_email(
-            #     to_email=customer_email_placeholder,
-            #     to_name=customer_name_placeholder,
-            #     subject=f"Confirmação do seu Agendamento Share2Inspire (Ref: {order_id})",
-            #     html_content=f"<p>Olá {customer_name_placeholder},</p><p>Confirmamos o pagamento do seu agendamento (Ref: {order_id}).</p><p>Detalhes: {booking_details_placeholder}</p><p>Obrigado!</p>"
-            # )
-            # print(f"SUCESSO: Email de confirmação para cliente {customer_email_placeholder} (encomenda {order_id}) seria enviado aqui.")
+        if not data:
+            logger.warning("Nenhum dado recebido no callback")
+            return jsonify({"error": "Nenhum dado recebido"}), 400
 
-        except Exception as email_error:
-            print(f"ERRO ao enviar email de confirmação pós-pagamento para encomenda {order_id}: {email_error}")
-            # Considerar logar este erro de forma mais persistente
+        # Validar callback com chave anti-phishing
+        if IFTHENPAY_CALLBACK_SECRET:
+            received_secret = data.get("callbackSecret")
+            if received_secret != IFTHENPAY_CALLBACK_SECRET:
+                logger.warning(f"Chave anti-phishing inválida: {received_secret}")
+                return jsonify({"error": "Chave anti-phishing inválida"}), 403
 
-        # Responder à Ifthenpay que o callback foi processado com sucesso
-        # A resposta exata depende da documentação (pode ser vazio, um JSON específico, etc.)
-        return jsonify({"status": "OK", "message": "Callback processado com sucesso."}) # Exemplo
+        # Extrair dados do callback
+        payment_method = data.get("type", "unknown").lower()
+        order_id = data.get("orderId")
+        reference = data.get("reference") or data.get("referenceId")
+        amount = data.get("amount")
+        status = data.get("status", "unknown").lower()
+        
+        # Validar dados mínimos
+        if not all([order_id, reference, amount]):
+            logger.warning("Dados de callback incompletos")
+            return jsonify({"error": "Dados de callback incompletos"}), 400
+        
+        # Processar pagamento com base no status
+        if status == "paid" or status == "completed":
+            # Em produção, atualizar status do pagamento no banco de dados
+            # update_payment_status(order_id, "paid")
+            
+            # Em produção, enviar email de confirmação ao cliente
+            # send_payment_confirmation_email(order_id)
+            
+            logger.info(f"Pagamento {payment_method} confirmado para pedido {order_id}")
+            return jsonify({"success": True, "message": "Pagamento processado com sucesso"}), 200
+        else:
+            logger.warning(f"Status de pagamento não reconhecido: {status}")
+            return jsonify({"success": False, "message": f"Status não processado: {status}"}), 200
+            
+    except Exception as e:
+        logger.exception(f"Erro ao processar callback de pagamento: {str(e)}")
+        return jsonify({"error": "Erro ao processar callback"}), 500
 
-    else:
-        # Lidar com outros estados (ex: CANCELADO, FALHADO)
-        print(f"Callback recebido para encomenda {order_id} com estado: {payment_status}")
-        return jsonify({"status": "OK", "message": f"Callback recebido para estado {payment_status}."}) # Exemplo
+@payment_bp.route("/status/<order_id>", methods=["GET"])
+@cross_origin()
+def payment_status(order_id):
+    """
+    Verifica o status de um pagamento
+    Em produção, consultar banco de dados
+    """
+    try:
+        # Em produção, consultar status do pagamento no banco de dados
+        # payment = get_payment_by_order_id(order_id)
+        
+        # Simulação para desenvolvimento
+        payment = {
+            "orderId": order_id,
+            "status": "pending",
+            "method": "multibanco",
+            "amount": 30.0,
+            "reference": "123456789",
+            "entity": "11111"
+        }
+        
+        return jsonify({
+            "success": True,
+            "payment": payment
+        }), 200
+            
+    except Exception as e:
+        logger.exception(f"Erro ao consultar status do pagamento: {str(e)}")
+        return jsonify({"error": "Erro ao consultar status do pagamento", "success": False}), 500
 
-    # Se chegou aqui, algo correu mal no processamento interno
-    return jsonify({"erro": "Erro interno no processamento do callback"}), 500
+# Funções auxiliares para persistência de dados (implementar em produção)
+def save_payment_data(order_id, method, amount, data):
+    """
+    Salva dados do pagamento em banco de dados
+    Implementar em produção
+    """
+    logger.info(f"Salvando dados de pagamento para pedido {order_id}")
+    # Implementação para banco de dados
 
-# TODO: Refatorar a lógica de envio de email Brevo para um módulo utilitário
-# Exemplo: src/utils/email.py
-# def send_brevo_email(to_email, to_name, subject, html_content):
-#     # ... (código de configuração e envio Brevo aqui)
+def update_payment_status(order_id, status):
+    """
+    Atualiza status do pagamento em banco de dados
+    Implementar em produção
+    """
+    logger.info(f"Atualizando status do pagamento para pedido {order_id}: {status}")
+    # Implementação para banco de dados
 
+def send_payment_confirmation_email(order_id):
+    """
+    Envia email de confirmação de pagamento
+    Implementar em produção
+    """
+    logger.info(f"Enviando email de confirmação para pedido {order_id}")
+    # Implementação para envio de email
