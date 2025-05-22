@@ -1,23 +1,20 @@
 runtime: python311
 entrypoint: gunicorn -b :$PORT --workers 1 --threads 8 --timeout 0 main:app
 
-# Variáveis de ambiente para substituir o Secret Manager
+# Variáveis de ambiente não sensíveis
 env_variables:
   FLASK_ENV: "production"
   FLASK_DEBUG: "False"
-  BREVO_API_KEY: "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"
   BREVO_SENDER_EMAIL: "srshare2inspire@gmail.com"
   BREVO_SENDER_NAME: "Share2Inspire"
-  IFTHENPAY_API_KEY: "3532-9893-7426-5310"  # Renomeado de GATEWAY_KEY para API_KEY
-  IFTHENPAY_MBWAY_KEY: "UWP-547025"
-  IFTHENPAY_PAYSHOP_KEY: "QTU-066969"
-  IFTHENPAY_MB_KEY: "BXG-350883"
-  IFTHENPAY_MULTIBANCO_ENTITY: "11111"  # Adicionado - necessário para Multibanco
-  IFTHENPAY_MULTIBANCO_SUBENTITY: "999"  # Adicionado - necessário para Multibanco
-  FLASK_SECRET_KEY: "6BgB0lORveVCA/bsnK3XddCBnxvN3+Q8Z8We7cBeWAQ="
-  ANTI_PHISHING_KEY: "SUbOv6HYq8WVAmSEqkLKZvjAhBPsr1LI9ifRXTtrvMs="
-  IFTHENPAY_CALLBACK_SECRET: "test_key_callback"
+  IFTHENPAY_MULTIBANCO_ENTITY: "11111"
+  IFTHENPAY_MULTIBANCO_SUBENTITY: "999"
   IFTHENPAY_CALLBACK_URL: "https://share2inspire-beckend.lm.r.appspot.com/api/payment/callback"
+
+# Para variáveis sensíveis, use o Secret Manager:
+# gcloud secrets create BREVO_API_KEY --data-file=/path/to/brevo_key.txt
+# gcloud secrets create IFTHENPAY_API_KEY --data-file=/path/to/ifthenpay_key.txt
+# etc.
 
 handlers:
 # Esta configuração serve todos os pedidos para a sua aplicação Flask.

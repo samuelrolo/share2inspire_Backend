@@ -39,13 +39,20 @@ ADMIN_NAME = "Share2Inspire Admin"
 
 api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
 
-@feedback_bp.route("/submit", methods=["POST"])
-@cross_origin()
+# Adicionar suporte explícito para OPTIONS em todos os endpoints
+@feedback_bp.route("/submit", methods=["POST", "OPTIONS"])
+@cross_origin(origins=["https://share2inspire.pt", "http://localhost:8080", "http://127.0.0.1:8080"], 
+              methods=["GET", "POST", "OPTIONS"], 
+              allow_headers=["Content-Type", "Authorization", "X-Requested-With"])
 def submit_feedback():
     """
     Endpoint para enviar feedback via email usando a API Brevo.
     Recebe dados do formulário e envia um email transacional para o administrador.
     """
+    # Responder explicitamente a pedidos OPTIONS
+    if request.method == "OPTIONS":
+        return "", 200
+        
     try:
         data = request.get_json()
         logger.info(f"Dados de feedback recebidos: {json.dumps(data, indent=2)}")
@@ -157,13 +164,19 @@ def submit_feedback():
             "status": "error"
         }), 500
 
-@feedback_bp.route("/newsletter", methods=["POST"])
-@cross_origin()
+@feedback_bp.route("/newsletter", methods=["POST", "OPTIONS"])
+@cross_origin(origins=["https://share2inspire.pt", "http://localhost:8080", "http://127.0.0.1:8080"], 
+              methods=["GET", "POST", "OPTIONS"], 
+              allow_headers=["Content-Type", "Authorization", "X-Requested-With"])
 def submit_newsletter():
     """
     Endpoint para inscrição na newsletter via email usando a API Brevo.
     Recebe dados do formulário e envia um email de confirmação.
     """
+    # Responder explicitamente a pedidos OPTIONS
+    if request.method == "OPTIONS":
+        return "", 200
+        
     try:
         data = request.get_json()
         logger.info(f"Dados de newsletter recebidos: {json.dumps(data, indent=2)}")
