@@ -15,8 +15,24 @@ load_dotenv()
 # Criar aplicação Flask
 app = Flask(__name__)
 
-# Configuração CORS mais específica para produção
-CORS(app, resources={r"/api/*": {"origins": ["https://share2inspire.pt", "http://localhost:3000"]}}, supports_credentials=True)
+# Configuração CORS melhorada para desenvolvimento e produção
+CORS(app, resources={
+    r"/api/*": {
+        "origins": [
+            "https://share2inspire.pt",           # Domínio de produção
+            "http://localhost:3000",              # Porta 3000 (comum para React/Node)
+            "http://localhost:5000",              # Porta 5000 (comum para Flask)
+            "http://localhost:5500",              # Porta 5500 (comum para Live Server no VS Code)
+            "http://localhost:8080",              # Porta 8080 (comum para http-server)
+            "http://127.0.0.1:3000",              # Alternativas com IP local
+            "http://127.0.0.1:5000",
+            "http://127.0.0.1:5500",
+            "http://127.0.0.1:8080"
+        ],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"]
+    }
+}, supports_credentials=True)
 
 # Configurar chave secreta
 app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24).hex())
