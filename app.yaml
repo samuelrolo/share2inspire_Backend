@@ -17,7 +17,13 @@ env_variables:
 # etc.
 
 handlers:
-# Esta configuração serve todos os pedidos para a sua aplicação Flask.
+# Configuração específica para API com métodos explícitos
+- url: /api/.*
+  script: auto
+  secure: always
+  # Não é necessário http_headers aqui, pois o middleware no main.py já cuida disso
+
+# Configuração para todas as outras rotas
 - url: /.*
   script: auto
-  secure: always # Força HTTPS
+  secure: always

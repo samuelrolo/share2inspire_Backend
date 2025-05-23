@@ -40,12 +40,15 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24).hex())
 # Middleware global para garantir cabeçalhos CORS em todas as respostas
 @app.after_request
 def add_cors_headers(response):
-    # Garantir que os cabeçalhos CORS são adicionados a todas as respostas
-    # mesmo para erros 404, 500, etc.
-    response.headers.add('Access-Control-Allow-Origin', 'https://share2inspire.pt')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
-    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    # Verificar se o cabeçalho já existe antes de adicionar
+    if 'Access-Control-Allow-Origin' not in response.headers:
+        response.headers.add('Access-Control-Allow-Origin', 'https://share2inspire.pt')
+    if 'Access-Control-Allow-Headers' not in response.headers:
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With')
+    if 'Access-Control-Allow-Methods' not in response.headers:
+        response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
+    if 'Access-Control-Allow-Credentials' not in response.headers:
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
     return response
 
 # Função para tratar preflight requests
