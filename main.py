@@ -1,7 +1,7 @@
 # main.py (na raiz do projeto)
 import os
 import logging
-from flask import Flask
+from flask import Flask, Blueprint, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
 
@@ -36,6 +36,35 @@ CORS(app, resources={
 
 # Configurar chave secreta
 app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24).hex())
+
+# Middleware global para garantir cabeçalhos CORS em todas as respostas
+@app.after_request
+def add_cors_headers(response):
+    # Garantir que os cabeçalhos CORS são adicionados a todas as respostas
+    # mesmo para erros 404, 500, etc.
+    response.headers.add('Access-Control-Allow-Origin', 'https://share2inspire.pt')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
+
+# Função para tratar preflight requests
+def handle_cors_preflight():
+    """
+    Trata requisições OPTIONS para CORS
+    Esta função deve ser chamada em todas as rotas que precisam tratar preflight requests
+    """
+    response = jsonify({"success": True})
+    response.headers.add('Access-Control-Allow-Origin', 'https://share2inspire.pt')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response, 200
+
+# Rota global para tratar OPTIONS em qualquer endpoint
+@app.route('/<path:path>', methods=['OPTIONS'])
+def handle_all_options(path):
+    return handle_cors_preflight()
 
 # Importar e registar blueprints
 try:

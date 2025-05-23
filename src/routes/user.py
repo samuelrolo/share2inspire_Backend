@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 from src.models.user import User, db
+from cors_fix import handle_cors_preflight
 
 user_bp = Blueprint('user', __name__)
 

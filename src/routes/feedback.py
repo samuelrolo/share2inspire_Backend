@@ -8,6 +8,7 @@ from sib_api_v3_sdk.rest import ApiException
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from dotenv import load_dotenv
+from cors_fix import handle_cors_preflight
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
