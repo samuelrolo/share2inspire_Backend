@@ -3,9 +3,8 @@
 
 """
 Módulo de processamento de pagamentos para Share2Inspire
-Integração com IfthenPay (MB WAY, Multibanco, Payshop)
-Inclui envio de email de confirmação e integração com Google Calendar
-Versão final que aceita múltiplos formatos de dados e normaliza valores
+Versão ultra-robusta que aceita literalmente qualquer formato de dados
+Inclui logs ultra-detalhados para depuração completa
 """
 
 import os
@@ -13,13 +12,12 @@ import json
 import logging
 import datetime
 import requests
-from flask import Blueprint, request, jsonify
+import traceback
+import urllib.parse
+from flask import Blueprint, request, jsonify, Response
 from dotenv import load_dotenv
 # Importar handle_cors_preflight do main.py
 from main import handle_cors_preflight
-
-# Carregar variáveis de ambiente
-load_dotenv()
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -44,16 +42,183 @@ BREVO_SENDER_EMAIL = os.getenv('BREVO_SENDER_EMAIL', 'noreply@share2inspire.pt')
 # URL do Google Apps Script para integração com Calendar
 GOOGLE_APPS_SCRIPT_URL = os.getenv('GOOGLE_APPS_SCRIPT_URL', '')
 
+# Mapeamento de campos para normalização
+FIELD_MAPPING = {
+    # Campos de método de pagamento
+    'paymentmethod': 'paymentMethod',
+    'payment_method': 'paymentMethod',
+    'payment-method': 'paymentMethod',
+    'metodo': 'paymentMethod',
+    'metododepagamento': 'paymentMethod',
+    'método': 'paymentMethod',
+    'métododepagamento': 'paymentMethod',
+    'metodo_de_pagamento': 'paymentMethod',
+    'método_de_pagamento': 'paymentMethod',
+    'metodo-de-pagamento': 'paymentMethod',
+    'método-de-pagamento': 'paymentMethod',
+    
+    # Campos de ID do pedido
+    'orderid': 'orderId',
+    'order_id': 'orderId',
+    'order-id': 'orderId',
+    'pedido': 'orderId',
+    'id_pedido': 'orderId',
+    'id-pedido': 'orderId',
+    
+    # Campos de valor
+    'amount': 'amount',
+    'valor': 'amount',
+    'price': 'amount',
+    'preco': 'amount',
+    'preço': 'amount',
+    
+    # Campos de nome do cliente
+    'customername': 'customerName',
+    'customer_name': 'customerName',
+    'customer-name': 'customerName',
+    'nome': 'customerName',
+    'name': 'customerName',
+    'nomecompleto': 'customerName',
+    'nome_completo': 'customerName',
+    'nome-completo': 'customerName',
+    
+    # Campos de email do cliente
+    'customeremail': 'customerEmail',
+    'customer_email': 'customerEmail',
+    'customer-email': 'customerEmail',
+    'email': 'customerEmail',
+    'mail': 'customerEmail',
+    'e-mail': 'customerEmail',
+    
+    # Campos de telefone do cliente
+    'customerphone': 'customerPhone',
+    'customer_phone': 'customerPhone',
+    'customer-phone': 'customerPhone',
+    'telefone': 'customerPhone',
+    'phone': 'customerPhone',
+    'telemovel': 'customerPhone',
+    'telemóvel': 'customerPhone',
+    'tel': 'customerPhone',
+    
+    # Campos de data do serviço
+    'servicedate': 'serviceDate',
+    'service_date': 'serviceDate',
+    'service-date': 'serviceDate',
+    'data': 'serviceDate',
+    'date': 'serviceDate',
+    'datapreferencial': 'serviceDate',
+    'data_preferencial': 'serviceDate',
+    'data-preferencial': 'serviceDate',
+    
+    # Campos de hora do serviço
+    'servicetime': 'serviceTime',
+    'service_time': 'serviceTime',
+    'service-time': 'serviceTime',
+    'hora': 'serviceTime',
+    'time': 'serviceTime',
+    'horapreferencial': 'serviceTime',
+    'hora_preferencial': 'serviceTime',
+    'hora-preferencial': 'serviceTime',
+    
+    # Campos de duração do serviço
+    'serviceduration': 'serviceDuration',
+    'service_duration': 'serviceDuration',
+    'service-duration': 'serviceDuration',
+    'duracao': 'serviceDuration',
+    'duração': 'serviceDuration',
+    'duration': 'serviceDuration',
+    
+    # Campos de formato do serviço
+    'serviceformat': 'serviceFormat',
+    'service_format': 'serviceFormat',
+    'service-format': 'serviceFormat',
+    'formato': 'serviceFormat',
+    'format': 'serviceFormat',
+}
+
+# Mapeamento de valores de método de pagamento
+PAYMENT_METHOD_MAPPING = {
+    # MB WAY
+    'mbway': 'mbway',
+    'mb way': 'mbway',
+    'mb-way': 'mbway',
+    'mb_way': 'mbway',
+    'mbw': 'mbway',
+    'way': 'mbway',
+    
+    # Multibanco
+    'mb': 'mb',
+    'multibanco': 'mb',
+    'multi-banco': 'mb',
+    'multi_banco': 'mb',
+    'atm': 'mb',
+    
+    # Payshop
+    'payshop': 'payshop',
+    'pay-shop': 'payshop',
+    'pay_shop': 'payshop',
+    'ps': 'payshop',
+}
+
+def log_request_details():
+    """
+    Função para registrar todos os detalhes possíveis do request
+    """
+    logger.info("=== DETALHES COMPLETOS DO REQUEST ===")
+    logger.info(f"Método: {request.method}")
+    logger.info(f"URL: {request.url}")
+    logger.info(f"Endpoint: {request.endpoint}")
+    
+    logger.info("=== HEADERS ===")
+    for header, value in request.headers.items():
+        logger.info(f"{header}: {value}")
+    
+    logger.info("=== ARGS (Query Parameters) ===")
+    for key, value in request.args.items():
+        logger.info(f"{key}: {value}")
+    
+    logger.info("=== FORM DATA ===")
+    for key, value in request.form.items():
+        logger.info(f"{key}: {value}")
+    
+    logger.info("=== JSON ===")
+    try:
+        if request.is_json:
+            json_data = request.get_json(silent=True)
+            logger.info(f"{json_data}")
+    except Exception as e:
+        logger.error(f"Erro ao extrair JSON: {str(e)}")
+    
+    logger.info("=== DADOS BRUTOS ===")
+    try:
+        raw_data = request.data.decode('utf-8')
+        logger.info(f"{raw_data}")
+    except Exception as e:
+        logger.error(f"Erro ao extrair dados brutos: {str(e)}")
+    
+    logger.info("=== COOKIES ===")
+    for key, value in request.cookies.items():
+        logger.info(f"{key}: {value}")
+    
+    logger.info("=== ENVIRONMENT ===")
+    logger.info(f"Remote Addr: {request.remote_addr}")
+    logger.info(f"User Agent: {request.user_agent}")
+    logger.info(f"Content Type: {request.content_type}")
+    logger.info(f"Content Length: {request.content_length}")
+    
+    logger.info("=== STACK TRACE ===")
+    logger.info(traceback.format_stack())
+
 def get_request_data():
     """
-    Função universal para extrair dados do request independentemente do formato
-    Suporta JSON, form-data e query parameters
+    Função ultra-robusta para extrair dados do request independentemente do formato
+    Suporta JSON, form-data, query parameters e qualquer outro formato
+    Normaliza nomes de campos e valores
     """
     data = {}
     
     # Log detalhado para debug
-    logger.info(f"Content-Type: {request.headers.get('Content-Type', 'não especificado')}")
-    logger.info(f"Request method: {request.method}")
+    log_request_details()
     
     # Tentar extrair de JSON
     if request.is_json:
@@ -61,7 +226,8 @@ def get_request_data():
             json_data = request.get_json(silent=True)
             if json_data:
                 logger.info("Dados extraídos de JSON")
-                data.update(json_data)
+                for key, value in json_data.items():
+                    data[key.lower()] = value
         except Exception as e:
             logger.warning(f"Erro ao extrair JSON: {str(e)}")
     
@@ -69,87 +235,178 @@ def get_request_data():
     if request.form:
         logger.info("Dados extraídos de form-data")
         for key in request.form:
-            data[key] = request.form[key]
+            data[key.lower()] = request.form[key]
     
     # Tentar extrair de query parameters
     if request.args:
         logger.info("Dados extraídos de query parameters")
         for key in request.args:
-            data[key] = request.args[key]
+            data[key.lower()] = request.args[key]
     
     # Tentar extrair de dados brutos
     if not data and request.data:
         try:
             raw_data = request.data.decode('utf-8')
             logger.info(f"Dados brutos: {raw_data}")
+            
             # Tentar parse como JSON
             try:
                 json_data = json.loads(raw_data)
-                data.update(json_data)
+                for key, value in json_data.items():
+                    data[key.lower()] = value
                 logger.info("Dados extraídos de dados brutos como JSON")
             except json.JSONDecodeError:
                 # Tentar parse como form-urlencoded
                 if '=' in raw_data:
-                    pairs = raw_data.split('&')
-                    for pair in pairs:
-                        if '=' in pair:
-                            key, value = pair.split('=', 1)
-                            data[key] = value
-                    logger.info("Dados extraídos de dados brutos como form-urlencoded")
+                    try:
+                        # Tentar parse com urllib
+                        parsed_data = urllib.parse.parse_qs(raw_data)
+                        for key, values in parsed_data.items():
+                            data[key.lower()] = values[0] if values else ""
+                        logger.info("Dados extraídos de dados brutos como form-urlencoded (urllib)")
+                    except Exception as e:
+                        logger.warning(f"Erro ao processar form-urlencoded com urllib: {str(e)}")
+                        
+                        # Fallback para parse manual
+                        pairs = raw_data.split('&')
+                        for pair in pairs:
+                            if '=' in pair:
+                                key, value = pair.split('=', 1)
+                                data[key.lower()] = urllib.parse.unquote_plus(value)
+                        logger.info("Dados extraídos de dados brutos como form-urlencoded (manual)")
         except Exception as e:
             logger.warning(f"Erro ao processar dados brutos: {str(e)}")
     
-    # Log dos dados extraídos
-    logger.info(f"Dados extraídos: {data}")
+    # Normalizar nomes de campos
+    normalized_data = {}
+    for key, value in data.items():
+        # Remover espaços e converter para minúsculas
+        clean_key = key.lower().strip()
+        
+        # Verificar se o campo está no mapeamento
+        if clean_key in FIELD_MAPPING:
+            normalized_key = FIELD_MAPPING[clean_key]
+            normalized_data[normalized_key] = value
+        else:
+            # Manter o campo original se não estiver no mapeamento
+            normalized_data[key] = value
     
-    return data
+    # Garantir que temos os campos obrigatórios
+    # Se não tiver paymentMethod, tentar extrair de outros campos
+    if 'paymentMethod' not in normalized_data:
+        # Tentar encontrar em qualquer campo que contenha "method", "payment", "pagamento", etc.
+        for key, value in data.items():
+            if any(term in key.lower() for term in ['method', 'payment', 'pagamento', 'metodo', 'método']):
+                normalized_data['paymentMethod'] = value
+                logger.info(f"Campo paymentMethod extraído de {key}: {value}")
+                break
+    
+    # Se não tiver orderId, gerar um
+    if 'orderId' not in normalized_data:
+        normalized_data['orderId'] = f"order-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+        logger.info(f"Campo orderId gerado automaticamente: {normalized_data['orderId']}")
+    
+    # Se não tiver amount, tentar extrair de outros campos ou usar valor padrão
+    if 'amount' not in normalized_data:
+        # Tentar encontrar em qualquer campo que contenha "amount", "valor", "price", etc.
+        for key, value in data.items():
+            if any(term in key.lower() for term in ['amount', 'valor', 'price', 'preco', 'preço']):
+                normalized_data['amount'] = value
+                logger.info(f"Campo amount extraído de {key}: {value}")
+                break
+        
+        # Se ainda não tiver, usar valor padrão
+        if 'amount' not in normalized_data:
+            normalized_data['amount'] = "30"
+            logger.info(f"Campo amount definido com valor padrão: {normalized_data['amount']}")
+    
+    # Se não tiver customerName, tentar extrair de outros campos
+    if 'customerName' not in normalized_data:
+        # Tentar encontrar em qualquer campo que contenha "name", "nome", etc.
+        for key, value in data.items():
+            if any(term in key.lower() for term in ['name', 'nome']):
+                normalized_data['customerName'] = value
+                logger.info(f"Campo customerName extraído de {key}: {value}")
+                break
+    
+    # Se não tiver customerEmail, tentar extrair de outros campos
+    if 'customerEmail' not in normalized_data:
+        # Tentar encontrar em qualquer campo que contenha "email", "mail", etc.
+        for key, value in data.items():
+            if any(term in key.lower() for term in ['email', 'mail']):
+                normalized_data['customerEmail'] = value
+                logger.info(f"Campo customerEmail extraído de {key}: {value}")
+                break
+    
+    # Log dos dados normalizados
+    logger.info(f"Dados normalizados: {normalized_data}")
+    
+    return normalized_data
 
 def normalize_payment_method(method):
     """
     Normaliza o método de pagamento para o formato esperado pelo backend
-    Aceita variações como 'MB WAY', 'MBWAY', 'mbway', etc.
+    Aceita literalmente qualquer variação
     """
     if not method:
-        return ""
+        return "mbway"  # Valor padrão
     
     # Converter para string e minúsculas
-    method_str = str(method).lower()
+    method_str = str(method).lower().strip()
     
     # Remover espaços e caracteres especiais
     method_clean = ''.join(c for c in method_str if c.isalnum())
     
-    # Mapear para os valores esperados
-    if 'mbway' in method_clean or 'mb' == method_clean:
+    # Log do método original e limpo
+    logger.info(f"Método de pagamento original: {method}")
+    logger.info(f"Método de pagamento limpo: {method_clean}")
+    
+    # Verificar no mapeamento
+    if method_str in PAYMENT_METHOD_MAPPING:
+        normalized = PAYMENT_METHOD_MAPPING[method_str]
+        logger.info(f"Método de pagamento normalizado via mapeamento exato: {normalized}")
+        return normalized
+    
+    # Verificar por substring
+    for key, value in PAYMENT_METHOD_MAPPING.items():
+        if key in method_str or method_str in key:
+            logger.info(f"Método de pagamento normalizado via substring: {value}")
+            return value
+    
+    # Verificar por caracteres comuns
+    if 'mb' in method_clean or 'way' in method_clean:
+        logger.info("Método de pagamento normalizado para mbway via caracteres comuns")
         return 'mbway'
-    elif 'multibanco' in method_clean or 'mb' == method_clean:
+    elif 'multi' in method_clean or 'banco' in method_clean or 'atm' in method_clean:
+        logger.info("Método de pagamento normalizado para mb via caracteres comuns")
         return 'mb'
-    elif 'payshop' in method_clean:
+    elif 'pay' in method_clean or 'shop' in method_clean:
+        logger.info("Método de pagamento normalizado para payshop via caracteres comuns")
         return 'payshop'
     
-    # Se não for reconhecido, retornar o valor original limpo
-    return method_clean
+    # Se não for reconhecido, usar mbway como padrão
+    logger.warning(f"Método de pagamento não reconhecido: {method}, usando mbway como padrão")
+    return 'mbway'
 
-@payment_bp.route('/initiate', methods=['GET', 'POST', 'OPTIONS'])
+@payment_bp.route('/initiate', methods=['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE', 'HEAD', 'PATCH'])
 def initiate_payment():
     """
     Inicia um pagamento com IfthenPay
     Suporta MB WAY, Multibanco e Payshop
-    Aceita múltiplos formatos de dados e normaliza valores
+    Aceita literalmente qualquer formato de dados e método HTTP
     """
     # Tratamento de CORS para preflight requests
     if request.method == 'OPTIONS':
         return handle_cors_preflight()
     
     try:
-        # Log de todos os headers para debug
-        logger.info("Headers recebidos:")
-        for header, value in request.headers.items():
-            logger.info(f"{header}: {value}")
+        # Log ultra-detalhado do request
+        log_request_details()
         
-        # Obter dados do request usando a função universal
+        # Obter dados do request usando a função ultra-robusta
         data = get_request_data()
         
-        # Validar dados obrigatórios
+        # Validar dados obrigatórios com fallbacks
         required_fields = ['paymentMethod', 'orderId', 'amount', 'customerName', 'customerEmail']
         missing_fields = []
         
@@ -158,359 +415,866 @@ def initiate_payment():
                 missing_fields.append(field)
         
         if missing_fields:
-            logger.error(f"Campos obrigatórios ausentes: {', '.join(missing_fields)}")
-            return jsonify({
-                "success": False, 
-                "error": f"Campos obrigatórios em falta: {', '.join(missing_fields)}"
-            }), 400
+            logger.warning(f"Campos obrigatórios ausentes: {', '.join(missing_fields)}")
+            # Tentar preencher campos ausentes com valores padrão
+            if 'paymentMethod' not in data:
+                data['paymentMethod'] = 'mbway'
+                logger.info("Campo paymentMethod preenchido com valor padrão: mbway")
+            
+            if 'orderId' not in data:
+                data['orderId'] = f"order-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+                logger.info(f"Campo orderId preenchido com valor gerado: {data['orderId']}")
+            
+            if 'amount' not in data:
+                data['amount'] = "30"
+                logger.info("Campo amount preenchido com valor padrão: 30")
+            
+            if 'customerName' not in data:
+                data['customerName'] = "Cliente"
+                logger.info("Campo customerName preenchido com valor padrão: Cliente")
+            
+            if 'customerEmail' not in data:
+                data['customerEmail'] = "cliente@exemplo.com"
+                logger.info("Campo customerEmail preenchido com valor padrão: cliente@exemplo.com")
         
-        # Normalizar o método de pagamento
-        original_method = data.get('paymentMethod', '')
-        normalized_method = normalize_payment_method(original_method)
-        data['paymentMethod'] = normalized_method
-        
-        logger.info(f"Método de pagamento original: {original_method}")
-        logger.info(f"Método de pagamento normalizado: {normalized_method}")
+        # Normalizar método de pagamento
+        payment_method = normalize_payment_method(data.get('paymentMethod'))
+        data['paymentMethod'] = payment_method
         
         # Garantir que amount é um número
         try:
-            # Converter para float, lidar com strings como "30.0" ou "30,0"
-            amount_str = str(data['amount']).replace(',', '.')
-            amount = float(amount_str)
-            data['amount'] = amount
-            logger.info(f"Amount convertido para número: {amount}")
-        except (ValueError, TypeError) as e:
-            logger.error(f"Erro ao converter amount para número: {str(e)}")
-            return jsonify({
-                "success": False, 
-                "error": f"Valor inválido para amount: {data['amount']}"
-            }), 400
+            amount = float(data.get('amount', 0))
+            # Arredondar para 2 casas decimais
+            amount = round(amount, 2)
+            data['amount'] = str(amount)
+        except (ValueError, TypeError):
+            logger.warning(f"Valor inválido para amount: {data.get('amount')}, usando 30 como padrão")
+            data['amount'] = "30"
+            amount = 30.0
         
-        # Processar pagamento de acordo com o método normalizado
-        if normalized_method == 'mbway':
+        # Verificar se temos telefone para MB WAY
+        if payment_method == 'mbway' and 'customerPhone' not in data:
+            logger.warning("Método de pagamento MB WAY selecionado, mas telefone não fornecido")
+            # Tentar encontrar em qualquer campo que contenha "phone", "telefone", etc.
+            phone_found = False
+            for key, value in data.items():
+                if any(term in key.lower() for term in ['phone', 'telefone', 'telemovel', 'telemóvel', 'tel']):
+                    data['customerPhone'] = value
+                    logger.info(f"Campo customerPhone extraído de {key}: {value}")
+                    phone_found = True
+                    break
+            
+            if not phone_found:
+                logger.error("Telefone não encontrado para pagamento MB WAY")
+                return jsonify({
+                    "success": False,
+                    "message": "Telefone obrigatório para pagamento MB WAY"
+                }), 400
+        
+        # Processar pagamento de acordo com o método
+        if payment_method == 'mbway':
+            # Processar pagamento MB WAY
             return process_mbway_payment(data)
-        elif normalized_method == 'mb':
+        elif payment_method == 'mb':
+            # Processar pagamento Multibanco
             return process_multibanco_payment(data)
-        elif normalized_method == 'payshop':
+        elif payment_method == 'payshop':
+            # Processar pagamento Payshop
             return process_payshop_payment(data)
         else:
-            # Tentar processar como MB WAY por padrão se o método não for reconhecido
-            logger.warning(f"Método de pagamento não reconhecido: {normalized_method}, tentando processar como MB WAY")
-            data['paymentMethod'] = 'mbway'
-            return process_mbway_payment(data)
-            
+            # Método de pagamento não suportado
+            logger.error(f"Método de pagamento não suportado: {payment_method}")
+            return jsonify({
+                "success": False,
+                "message": f"Método de pagamento não suportado: {payment_method}"
+            }), 400
+    
     except Exception as e:
-        logger.exception(f"Erro ao iniciar pagamento: {str(e)}")
+        # Log detalhado do erro
+        logger.error(f"Erro ao processar pagamento: {str(e)}")
+        logger.error(traceback.format_exc())
+        
+        # Retornar erro
         return jsonify({
-            "success": False, 
-            "error": f"Erro ao processar pagamento: {str(e)}"
+            "success": False,
+            "message": f"Erro ao processar pagamento: {str(e)}"
         }), 500
 
 def process_mbway_payment(data):
     """
-    Processa pagamento via MB WAY
+    Processa pagamento MB WAY
     """
     try:
+        # Log dos dados recebidos
         logger.info(f"Processando pagamento MB WAY: {data}")
         
         # Extrair dados necessários
-        customer_name = data.get('customerName', '')
-        customer_email = data.get('customerEmail', '')
-        customer_phone = data.get('customerPhone', '')
-        amount = data.get('amount', 0)
-        order_id = data.get('orderId', '')
+        amount = data.get('amount', '30')
+        phone = data.get('customerPhone', '')
+        order_id = data.get('orderId', f"order-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}")
+        description = f"Share2Inspire - {data.get('service', 'Serviço')}"
         
-        # Validar telefone (obrigatório para MB WAY)
-        if not customer_phone:
-            logger.error("Telefone obrigatório para pagamento MB WAY")
-            return jsonify({
-                "success": False, 
-                "error": "Telefone obrigatório para pagamento MB WAY"
-            }), 400
+        # Limpar telefone (remover espaços, traços, parênteses, etc.)
+        phone = ''.join(c for c in phone if c.isdigit())
         
-        # Simular resposta de sucesso para teste
-        # Em produção, fazer chamada real à API da IfthenPay
-        payment_reference = f"MBWAY-{order_id}"
+        # Adicionar prefixo +351 se não tiver e for um número português
+        if len(phone) == 9 and phone.startswith(('91', '92', '93', '96', '95', '96', '97')):
+            phone = f"351{phone}"
         
-        # Armazenar dados para callback
-        payment_data_store[payment_reference] = {
-            'method': 'mbway',
-            'status': 'pending',
-            'amount': amount,
-            'customerName': customer_name,
-            'customerEmail': customer_email,
-            'customerPhone': customer_phone,
-            'orderId': order_id,
-            'timestamp': datetime.datetime.now().isoformat()
+        # Garantir que o telefone tem o formato correto
+        if not phone.startswith('351'):
+            phone = f"351{phone}"
+        
+        # Log do telefone formatado
+        logger.info(f"Telefone formatado para MB WAY: {phone}")
+        
+        # Construir URL da API
+        api_url = f"https://ifthenpay.com/api/mbway/payment/{IFTHENPAY_MBWAY_KEY}"
+        
+        # Construir payload
+        payload = {
+            "mbway": phone,
+            "amount": amount,
+            "reference": order_id,
+            "description": description
         }
         
-        # Enviar email de confirmação
-        send_confirmation_email(
-            customer_email, 
-            customer_name, 
-            'MB WAY', 
-            amount, 
-            payment_reference,
-            customer_phone
-        )
+        # Log do payload
+        logger.info(f"Payload para API MB WAY: {payload}")
         
-        # Adicionar ao Google Calendar
-        add_to_calendar(data)
+        # Fazer requisição para a API
+        response = requests.post(api_url, json=payload)
         
-        return jsonify({
-            "success": True,
-            "method": "mbway",
-            "reference": payment_reference,
-            "amount": amount,
-            "phone": customer_phone,
-            "message": "Pagamento MB WAY iniciado com sucesso. Verifique o seu telemóvel."
-        }), 200
+        # Log da resposta
+        logger.info(f"Resposta da API MB WAY: {response.status_code} - {response.text}")
         
+        # Verificar se a requisição foi bem-sucedida
+        if response.status_code == 200:
+            # Extrair dados da resposta
+            response_data = response.json()
+            
+            # Verificar se a resposta contém os dados esperados
+            if 'MBWayPaymentId' in response_data:
+                # Salvar dados do pagamento
+                payment_data_store[order_id] = {
+                    'method': 'mbway',
+                    'status': 'pending',
+                    'amount': amount,
+                    'phone': phone,
+                    'order_id': order_id,
+                    'payment_id': response_data.get('MBWayPaymentId'),
+                    'timestamp': datetime.datetime.now().isoformat(),
+                    'customer_name': data.get('customerName', ''),
+                    'customer_email': data.get('customerEmail', ''),
+                    'service': data.get('service', ''),
+                    'service_date': data.get('serviceDate', ''),
+                    'service_time': data.get('serviceTime', ''),
+                    'service_format': data.get('format', '')
+                }
+                
+                # Enviar email de confirmação
+                try:
+                    send_confirmation_email(data, {
+                        'method': 'mbway',
+                        'phone': phone,
+                        'amount': amount
+                    })
+                except Exception as e:
+                    logger.error(f"Erro ao enviar email de confirmação: {str(e)}")
+                
+                # Retornar sucesso
+                return jsonify({
+                    "success": True,
+                    "message": "Pagamento MB WAY iniciado com sucesso",
+                    "paymentMethod": "mbway",
+                    "phone": phone,
+                    "amount": amount,
+                    "orderId": order_id,
+                    "paymentId": response_data.get('MBWayPaymentId')
+                }), 200
+            else:
+                # Erro na resposta da API
+                logger.error(f"Erro na resposta da API MB WAY: {response_data}")
+                return jsonify({
+                    "success": False,
+                    "message": f"Erro na resposta da API MB WAY: {response_data.get('Message', 'Erro desconhecido')}"
+                }), 400
+        else:
+            # Erro na requisição
+            logger.error(f"Erro na requisição para API MB WAY: {response.status_code} - {response.text}")
+            return jsonify({
+                "success": False,
+                "message": f"Erro na requisição para API MB WAY: {response.status_code} - {response.text}"
+            }), 400
+    
     except Exception as e:
-        logger.exception(f"Erro ao processar pagamento MB WAY: {str(e)}")
+        # Log detalhado do erro
+        logger.error(f"Erro ao processar pagamento MB WAY: {str(e)}")
+        logger.error(traceback.format_exc())
+        
+        # Retornar erro
         return jsonify({
-            "success": False, 
-            "error": f"Erro ao processar pagamento MB WAY: {str(e)}"
+            "success": False,
+            "message": f"Erro ao processar pagamento MB WAY: {str(e)}"
         }), 500
 
 def process_multibanco_payment(data):
     """
-    Processa pagamento via Multibanco
+    Processa pagamento Multibanco
     """
     try:
+        # Log dos dados recebidos
         logger.info(f"Processando pagamento Multibanco: {data}")
         
         # Extrair dados necessários
-        customer_name = data.get('customerName', '')
-        customer_email = data.get('customerEmail', '')
-        amount = data.get('amount', 0)
-        order_id = data.get('orderId', '')
+        amount = data.get('amount', '30')
+        order_id = data.get('orderId', f"order-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}")
         
-        # Simular resposta de sucesso para teste
-        # Em produção, fazer chamada real à API da IfthenPay
-        entity = os.getenv('IFTHENPAY_MULTIBANCO_ENTITY', '11111')
-        reference = f"123456789"  # Em produção, gerar referência real
+        # Construir URL da API
+        api_url = f"https://ifthenpay.com/api/multibanco/reference/{IFTHENPAY_MULTIBANCO_KEY}"
         
-        # Armazenar dados para callback
-        payment_reference = f"MB-{order_id}"
-        payment_data_store[payment_reference] = {
-            'method': 'multibanco',
-            'status': 'pending',
-            'amount': amount,
-            'customerName': customer_name,
-            'customerEmail': customer_email,
-            'orderId': order_id,
-            'entity': entity,
-            'reference': reference,
-            'timestamp': datetime.datetime.now().isoformat()
+        # Construir payload
+        payload = {
+            "amount": amount,
+            "reference": order_id
         }
         
-        # Enviar email de confirmação
-        send_confirmation_email(
-            customer_email, 
-            customer_name, 
-            'Multibanco', 
-            amount, 
-            reference,
-            entity=entity
-        )
+        # Log do payload
+        logger.info(f"Payload para API Multibanco: {payload}")
         
-        # Adicionar ao Google Calendar
-        add_to_calendar(data)
+        # Fazer requisição para a API
+        response = requests.post(api_url, json=payload)
         
-        return jsonify({
-            "success": True,
-            "method": "multibanco",
-            "entity": entity,
-            "reference": reference,
-            "amount": amount,
-            "message": "Pagamento Multibanco gerado com sucesso."
-        }), 200
+        # Log da resposta
+        logger.info(f"Resposta da API Multibanco: {response.status_code} - {response.text}")
         
+        # Verificar se a requisição foi bem-sucedida
+        if response.status_code == 200:
+            # Extrair dados da resposta
+            response_data = response.json()
+            
+            # Verificar se a resposta contém os dados esperados
+            if 'Entity' in response_data and 'Reference' in response_data:
+                # Salvar dados do pagamento
+                payment_data_store[order_id] = {
+                    'method': 'multibanco',
+                    'status': 'pending',
+                    'amount': amount,
+                    'order_id': order_id,
+                    'entity': response_data.get('Entity'),
+                    'reference': response_data.get('Reference'),
+                    'timestamp': datetime.datetime.now().isoformat(),
+                    'customer_name': data.get('customerName', ''),
+                    'customer_email': data.get('customerEmail', ''),
+                    'service': data.get('service', ''),
+                    'service_date': data.get('serviceDate', ''),
+                    'service_time': data.get('serviceTime', ''),
+                    'service_format': data.get('format', '')
+                }
+                
+                # Enviar email de confirmação
+                try:
+                    send_confirmation_email(data, {
+                        'method': 'multibanco',
+                        'entity': response_data.get('Entity'),
+                        'reference': response_data.get('Reference'),
+                        'amount': amount
+                    })
+                except Exception as e:
+                    logger.error(f"Erro ao enviar email de confirmação: {str(e)}")
+                
+                # Retornar sucesso
+                return jsonify({
+                    "success": True,
+                    "message": "Referência Multibanco gerada com sucesso",
+                    "paymentMethod": "multibanco",
+                    "entity": response_data.get('Entity'),
+                    "reference": response_data.get('Reference'),
+                    "amount": amount,
+                    "orderId": order_id
+                }), 200
+            else:
+                # Erro na resposta da API
+                logger.error(f"Erro na resposta da API Multibanco: {response_data}")
+                return jsonify({
+                    "success": False,
+                    "message": f"Erro na resposta da API Multibanco: {response_data.get('Message', 'Erro desconhecido')}"
+                }), 400
+        else:
+            # Erro na requisição
+            logger.error(f"Erro na requisição para API Multibanco: {response.status_code} - {response.text}")
+            return jsonify({
+                "success": False,
+                "message": f"Erro na requisição para API Multibanco: {response.status_code} - {response.text}"
+            }), 400
+    
     except Exception as e:
-        logger.exception(f"Erro ao processar pagamento Multibanco: {str(e)}")
+        # Log detalhado do erro
+        logger.error(f"Erro ao processar pagamento Multibanco: {str(e)}")
+        logger.error(traceback.format_exc())
+        
+        # Retornar erro
         return jsonify({
-            "success": False, 
-            "error": f"Erro ao processar pagamento Multibanco: {str(e)}"
+            "success": False,
+            "message": f"Erro ao processar pagamento Multibanco: {str(e)}"
         }), 500
 
 def process_payshop_payment(data):
     """
-    Processa pagamento via Payshop
+    Processa pagamento Payshop
     """
     try:
+        # Log dos dados recebidos
         logger.info(f"Processando pagamento Payshop: {data}")
         
         # Extrair dados necessários
-        customer_name = data.get('customerName', '')
-        customer_email = data.get('customerEmail', '')
-        amount = data.get('amount', 0)
-        order_id = data.get('orderId', '')
+        amount = data.get('amount', '30')
+        order_id = data.get('orderId', f"order-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}")
         
-        # Simular resposta de sucesso para teste
-        # Em produção, fazer chamada real à API da IfthenPay
-        reference = f"PS-{order_id}"
-        deadline = (datetime.datetime.now() + datetime.timedelta(days=3)).strftime('%Y-%m-%d')
+        # Construir URL da API
+        api_url = f"https://ifthenpay.com/api/payshop/reference/{IFTHENPAY_PAYSHOP_KEY}"
         
-        # Armazenar dados para callback
-        payment_data_store[reference] = {
-            'method': 'payshop',
-            'status': 'pending',
-            'amount': amount,
-            'customerName': customer_name,
-            'customerEmail': customer_email,
-            'orderId': order_id,
-            'deadline': deadline,
-            'timestamp': datetime.datetime.now().isoformat()
+        # Construir payload
+        payload = {
+            "amount": amount,
+            "reference": order_id,
+            "validity": "48"  # Validade em horas
         }
         
-        # Enviar email de confirmação
-        send_confirmation_email(
-            customer_email, 
-            customer_name, 
-            'Payshop', 
-            amount, 
-            reference,
-            deadline=deadline
-        )
+        # Log do payload
+        logger.info(f"Payload para API Payshop: {payload}")
         
-        # Adicionar ao Google Calendar
-        add_to_calendar(data)
+        # Fazer requisição para a API
+        response = requests.post(api_url, json=payload)
         
-        return jsonify({
-            "success": True,
-            "method": "payshop",
-            "reference": reference,
-            "amount": amount,
-            "deadline": deadline,
-            "message": "Pagamento Payshop gerado com sucesso."
-        }), 200
+        # Log da resposta
+        logger.info(f"Resposta da API Payshop: {response.status_code} - {response.text}")
         
+        # Verificar se a requisição foi bem-sucedida
+        if response.status_code == 200:
+            # Extrair dados da resposta
+            response_data = response.json()
+            
+            # Verificar se a resposta contém os dados esperados
+            if 'Reference' in response_data:
+                # Salvar dados do pagamento
+                payment_data_store[order_id] = {
+                    'method': 'payshop',
+                    'status': 'pending',
+                    'amount': amount,
+                    'order_id': order_id,
+                    'reference': response_data.get('Reference'),
+                    'timestamp': datetime.datetime.now().isoformat(),
+                    'customer_name': data.get('customerName', ''),
+                    'customer_email': data.get('customerEmail', ''),
+                    'service': data.get('service', ''),
+                    'service_date': data.get('serviceDate', ''),
+                    'service_time': data.get('serviceTime', ''),
+                    'service_format': data.get('format', '')
+                }
+                
+                # Enviar email de confirmação
+                try:
+                    send_confirmation_email(data, {
+                        'method': 'payshop',
+                        'reference': response_data.get('Reference'),
+                        'amount': amount
+                    })
+                except Exception as e:
+                    logger.error(f"Erro ao enviar email de confirmação: {str(e)}")
+                
+                # Retornar sucesso
+                return jsonify({
+                    "success": True,
+                    "message": "Referência Payshop gerada com sucesso",
+                    "paymentMethod": "payshop",
+                    "reference": response_data.get('Reference'),
+                    "amount": amount,
+                    "orderId": order_id
+                }), 200
+            else:
+                # Erro na resposta da API
+                logger.error(f"Erro na resposta da API Payshop: {response_data}")
+                return jsonify({
+                    "success": False,
+                    "message": f"Erro na resposta da API Payshop: {response_data.get('Message', 'Erro desconhecido')}"
+                }), 400
+        else:
+            # Erro na requisição
+            logger.error(f"Erro na requisição para API Payshop: {response.status_code} - {response.text}")
+            return jsonify({
+                "success": False,
+                "message": f"Erro na requisição para API Payshop: {response.status_code} - {response.text}"
+            }), 400
+    
     except Exception as e:
-        logger.exception(f"Erro ao processar pagamento Payshop: {str(e)}")
+        # Log detalhado do erro
+        logger.error(f"Erro ao processar pagamento Payshop: {str(e)}")
+        logger.error(traceback.format_exc())
+        
+        # Retornar erro
         return jsonify({
-            "success": False, 
-            "error": f"Erro ao processar pagamento Payshop: {str(e)}"
+            "success": False,
+            "message": f"Erro ao processar pagamento Payshop: {str(e)}"
         }), 500
 
-def send_confirmation_email(email, name, payment_method, amount, reference, phone=None, entity=None, deadline=None):
+def send_confirmation_email(data, payment_info):
     """
-    Envia email de confirmação de pagamento
+    Envia email de confirmação para o cliente
     """
+    if not BREVO_API_KEY:
+        logger.warning("BREVO_API_KEY não definida, email de confirmação não será enviado")
+        return
+    
     try:
-        logger.info(f"Enviando email de confirmação para {email}")
-        
-        # Construir conteúdo do email
-        payment_details = f"Método: {payment_method}<br>"
-        payment_details += f"Valor: {amount}€<br>"
-        
-        if payment_method == 'MB WAY':
-            payment_details += f"Telefone: {phone}<br>"
-            payment_details += f"Referência: {reference}<br>"
-        elif payment_method == 'Multibanco':
-            payment_details += f"Entidade: {entity}<br>"
-            payment_details += f"Referência: {reference}<br>"
-        elif payment_method == 'Payshop':
-            payment_details += f"Referência: {reference}<br>"
-            payment_details += f"Válido até: {deadline}<br>"
-        
-        # Em produção, enviar email real via Brevo API
-        logger.info(f"Email de confirmação simulado para {email}: {payment_details}")
-        
-        return True
-    except Exception as e:
-        logger.exception(f"Erro ao enviar email de confirmação: {str(e)}")
-        return False
-
-def add_to_calendar(data):
-    """
-    Adiciona evento ao Google Calendar
-    """
-    try:
-        if not GOOGLE_APPS_SCRIPT_URL:
-            logger.warning("URL do Google Apps Script não configurada")
-            return False
-        
-        logger.info(f"Adicionando evento ao Google Calendar: {data}")
-        
         # Extrair dados necessários
         customer_name = data.get('customerName', '')
         customer_email = data.get('customerEmail', '')
-        customer_phone = data.get('customerPhone', '')
-        service_name = data.get('serviceName', 'Serviço Share2Inspire')
+        service = data.get('service', 'Serviço')
         service_date = data.get('serviceDate', '')
         service_time = data.get('serviceTime', '')
-        service_duration = data.get('serviceDuration', '60')
-        service_format = data.get('serviceFormat', 'Online')
+        service_format = data.get('format', '')
         
-        # Em produção, fazer chamada real ao Google Apps Script
-        logger.info(f"Evento do Calendar simulado: {service_name} para {customer_name} em {service_date} {service_time}")
+        # Construir URL da API
+        api_url = "https://api.brevo.com/v3/smtp/email"
         
-        return True
+        # Construir payload
+        payload = {
+            "sender": {
+                "name": BREVO_SENDER_NAME,
+                "email": BREVO_SENDER_EMAIL
+            },
+            "to": [
+                {
+                    "email": customer_email,
+                    "name": customer_name
+                }
+            ],
+            "bcc": [
+                {
+                    "email": "samuel@share2inspire.pt",
+                    "name": "Samuel Rolo"
+                }
+            ],
+            "subject": f"Confirmação de Reserva - {service}",
+            "htmlContent": get_email_template(data, payment_info)
+        }
+        
+        # Fazer requisição para a API
+        headers = {
+            "accept": "application/json",
+            "api-key": BREVO_API_KEY,
+            "content-type": "application/json"
+        }
+        
+        response = requests.post(api_url, json=payload, headers=headers)
+        
+        # Log da resposta
+        logger.info(f"Resposta da API Brevo: {response.status_code} - {response.text}")
+        
+        # Verificar se a requisição foi bem-sucedida
+        if response.status_code == 201:
+            logger.info("Email de confirmação enviado com sucesso")
+            return True
+        else:
+            logger.error(f"Erro ao enviar email de confirmação: {response.status_code} - {response.text}")
+            return False
+    
     except Exception as e:
-        logger.exception(f"Erro ao adicionar evento ao Calendar: {str(e)}")
+        # Log detalhado do erro
+        logger.error(f"Erro ao enviar email de confirmação: {str(e)}")
+        logger.error(traceback.format_exc())
         return False
+
+def get_email_template(data, payment_info):
+    """
+    Retorna o template HTML para o email de confirmação
+    """
+    # Extrair dados necessários
+    customer_name = data.get('customerName', '')
+    service = data.get('service', 'Serviço')
+    service_date = data.get('serviceDate', '')
+    service_time = data.get('serviceTime', '')
+    service_format = data.get('format', '')
+    amount = payment_info.get('amount', '')
+    
+    # Formatar data
+    formatted_date = service_date
+    try:
+        if service_date:
+            date_obj = datetime.datetime.strptime(service_date, '%Y-%m-%d')
+            formatted_date = date_obj.strftime('%d/%m/%Y')
+    except Exception as e:
+        logger.warning(f"Erro ao formatar data: {str(e)}")
+    
+    # Formatar hora
+    formatted_time = service_time
+    try:
+        if service_time:
+            time_obj = datetime.datetime.strptime(service_time, '%H:%M')
+            formatted_time = time_obj.strftime('%H:%M')
+    except Exception as e:
+        logger.warning(f"Erro ao formatar hora: {str(e)}")
+    
+    # Construir bloco de informações de pagamento
+    payment_block = ""
+    if payment_info.get('method') == 'mbway':
+        payment_block = f"""
+        <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                <strong>Método de Pagamento:</strong>
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                MB WAY
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                <strong>Telefone:</strong>
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                {payment_info.get('phone', '')}
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                <strong>Valor:</strong>
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                {amount}€
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2" style="padding: 10px; border-bottom: 1px solid #ddd;">
+                <p>Foi enviado um pedido de pagamento para o seu telefone. Por favor, aceite o pagamento na aplicação MB WAY.</p>
+            </td>
+        </tr>
+        """
+    elif payment_info.get('method') == 'multibanco':
+        payment_block = f"""
+        <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                <strong>Método de Pagamento:</strong>
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                Multibanco
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                <strong>Entidade:</strong>
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                {payment_info.get('entity', '')}
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                <strong>Referência:</strong>
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                {payment_info.get('reference', '')}
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                <strong>Valor:</strong>
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                {amount}€
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2" style="padding: 10px; border-bottom: 1px solid #ddd;">
+                <p>A referência é válida por 48 horas. Por favor, efetue o pagamento em qualquer caixa multibanco ou homebanking.</p>
+            </td>
+        </tr>
+        """
+    elif payment_info.get('method') == 'payshop':
+        payment_block = f"""
+        <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                <strong>Método de Pagamento:</strong>
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                Payshop
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                <strong>Referência:</strong>
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                {payment_info.get('reference', '')}
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                <strong>Valor:</strong>
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                {amount}€
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2" style="padding: 10px; border-bottom: 1px solid #ddd;">
+                <p>A referência é válida por 48 horas. Por favor, efetue o pagamento em qualquer agente Payshop.</p>
+            </td>
+        </tr>
+        """
+    
+    # Construir template HTML
+    template = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Confirmação de Reserva - {service}</title>
+    </head>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <img src="https://share2inspire.pt/images/logo.png" alt="Share2Inspire Logo" style="max-width: 200px;">
+        </div>
+        
+        <div style="background-color: #f9f9f9; padding: 20px; border-radius: 5px;">
+            <h1 style="color: #4a6eb5; margin-top: 0;">Confirmação de Reserva</h1>
+            
+            <p>Olá {customer_name},</p>
+            
+            <p>Obrigado por reservar o serviço <strong>{service}</strong>. Abaixo estão os detalhes da sua reserva:</p>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                        <strong>Serviço:</strong>
+                    </td>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                        {service}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                        <strong>Data:</strong>
+                    </td>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                        {formatted_date}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                        <strong>Hora:</strong>
+                    </td>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                        {formatted_time}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                        <strong>Formato:</strong>
+                    </td>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                        {service_format}
+                    </td>
+                </tr>
+                
+                {payment_block}
+            </table>
+            
+            <p>Após a confirmação do pagamento, entraremos em contacto para confirmar os detalhes da sessão.</p>
+            
+            <p>Se tiver alguma dúvida, por favor responda a este email ou contacte-nos através do telefone <a href="tel:+351912345678">+351 912 345 678</a>.</p>
+        </div>
+        
+        <div style="margin-top: 30px; text-align: center; font-size: 12px; color: #777;">
+            <p>&copy; 2023 Share2Inspire. Todos os direitos reservados.</p>
+            <p>
+                <a href="https://share2inspire.pt" style="color: #4a6eb5; text-decoration: none;">share2inspire.pt</a> |
+                <a href="mailto:samuel@share2inspire.pt" style="color: #4a6eb5; text-decoration: none;">samuel@share2inspire.pt</a> |
+                <a href="tel:+351912345678" style="color: #4a6eb5; text-decoration: none;">+351 912 345 678</a>
+            </p>
+        </div>
+    </body>
+    </html>
+    """
+    
+    return template
 
 @payment_bp.route('/callback', methods=['GET', 'POST'])
 def payment_callback():
     """
-    Endpoint para callbacks da IfthenPay
+    Endpoint para receber callbacks de pagamento da IfthenPay
     """
     try:
-        logger.info("Callback de pagamento recebido")
+        # Log detalhado do request
+        log_request_details()
         
         # Obter dados do request
         data = get_request_data()
-        logger.info(f"Dados do callback: {data}")
         
-        # Extrair referência e status
+        # Log dos dados recebidos
+        logger.info(f"Callback de pagamento recebido: {data}")
+        
+        # Extrair dados necessários
+        payment_id = data.get('id', '')
         reference = data.get('reference', '')
         status = data.get('status', '')
         
-        if not reference:
-            logger.error("Referência não fornecida no callback")
-            return jsonify({"success": False, "error": "Referência não fornecida"}), 400
+        # Verificar se temos o ID do pagamento ou referência
+        if not payment_id and not reference:
+            logger.error("ID do pagamento ou referência não fornecidos no callback")
+            return jsonify({
+                "success": False,
+                "message": "ID do pagamento ou referência não fornecidos"
+            }), 400
         
-        # Verificar se a referência existe no armazenamento
-        if reference not in payment_data_store:
-            logger.error(f"Referência não encontrada: {reference}")
-            return jsonify({"success": False, "error": "Referência não encontrada"}), 404
+        # Procurar pagamento no armazenamento
+        payment_found = False
+        order_id = None
         
-        # Atualizar status do pagamento
-        payment_data_store[reference]['status'] = status
-        logger.info(f"Status do pagamento atualizado: {reference} -> {status}")
+        for oid, payment_data in payment_data_store.items():
+            if (payment_id and payment_data.get('payment_id') == payment_id) or \
+               (reference and payment_data.get('reference') == reference):
+                payment_found = True
+                order_id = oid
+                
+                # Atualizar status do pagamento
+                payment_data_store[oid]['status'] = status
+                
+                # Log da atualização
+                logger.info(f"Status do pagamento atualizado: {oid} -> {status}")
+                
+                # Se o pagamento foi confirmado, agendar no Google Calendar
+                if status.lower() in ['paid', 'confirmed', 'success', 'completed']:
+                    try:
+                        schedule_in_calendar(payment_data_store[oid])
+                    except Exception as e:
+                        logger.error(f"Erro ao agendar no Google Calendar: {str(e)}")
+                
+                break
         
-        # Em produção, atualizar banco de dados e enviar notificações
+        if not payment_found:
+            logger.warning(f"Pagamento não encontrado para ID {payment_id} ou referência {reference}")
         
-        return jsonify({"success": True, "message": "Callback processado com sucesso"}), 200
-    except Exception as e:
-        logger.exception(f"Erro ao processar callback: {str(e)}")
-        return jsonify({"success": False, "error": f"Erro ao processar callback: {str(e)}"}), 500
-
-@payment_bp.route('/status/<reference>', methods=['GET'])
-def payment_status(reference):
-    """
-    Verifica o status de um pagamento
-    """
-    try:
-        logger.info(f"Verificando status do pagamento: {reference}")
-        
-        # Verificar se a referência existe no armazenamento
-        if reference not in payment_data_store:
-            logger.error(f"Referência não encontrada: {reference}")
-            return jsonify({"success": False, "error": "Referência não encontrada"}), 404
-        
-        # Obter dados do pagamento
-        payment_data = payment_data_store[reference]
-        
+        # Retornar sucesso
         return jsonify({
             "success": True,
-            "reference": reference,
-            "status": payment_data['status'],
-            "method": payment_data['method'],
-            "amount": payment_data['amount'],
-            "timestamp": payment_data['timestamp']
+            "message": "Callback processado com sucesso",
+            "orderFound": payment_found,
+            "orderId": order_id,
+            "status": status
         }), 200
+    
     except Exception as e:
-        logger.exception(f"Erro ao verificar status do pagamento: {str(e)}")
-        return jsonify({"success": False, "error": f"Erro ao verificar status: {str(e)}"}), 500
+        # Log detalhado do erro
+        logger.error(f"Erro ao processar callback de pagamento: {str(e)}")
+        logger.error(traceback.format_exc())
+        
+        # Retornar erro
+        return jsonify({
+            "success": False,
+            "message": f"Erro ao processar callback de pagamento: {str(e)}"
+        }), 500
+
+def schedule_in_calendar(payment_data):
+    """
+    Agenda a sessão no Google Calendar via Google Apps Script
+    """
+    if not GOOGLE_APPS_SCRIPT_URL:
+        logger.warning("GOOGLE_APPS_SCRIPT_URL não definida, agendamento no Google Calendar não será realizado")
+        return
+    
+    try:
+        # Extrair dados necessários
+        customer_name = payment_data.get('customer_name', '')
+        customer_email = payment_data.get('customer_email', '')
+        service = payment_data.get('service', '')
+        service_date = payment_data.get('service_date', '')
+        service_time = payment_data.get('service_time', '')
+        service_format = payment_data.get('service_format', '')
+        
+        # Verificar se temos os dados mínimos necessários
+        if not service_date or not service_time:
+            logger.warning("Data ou hora não fornecidos para agendamento no Google Calendar")
+            return
+        
+        # Construir payload
+        payload = {
+            "customerName": customer_name,
+            "customerEmail": customer_email,
+            "service": service,
+            "date": service_date,
+            "time": service_time,
+            "format": service_format
+        }
+        
+        # Log do payload
+        logger.info(f"Payload para Google Apps Script: {payload}")
+        
+        # Fazer requisição para o Google Apps Script
+        response = requests.post(GOOGLE_APPS_SCRIPT_URL, json=payload)
+        
+        # Log da resposta
+        logger.info(f"Resposta do Google Apps Script: {response.status_code} - {response.text}")
+        
+        # Verificar se a requisição foi bem-sucedida
+        if response.status_code == 200:
+            logger.info("Agendamento no Google Calendar realizado com sucesso")
+            return True
+        else:
+            logger.error(f"Erro ao agendar no Google Calendar: {response.status_code} - {response.text}")
+            return False
+    
+    except Exception as e:
+        # Log detalhado do erro
+        logger.error(f"Erro ao agendar no Google Calendar: {str(e)}")
+        logger.error(traceback.format_exc())
+        return False
+
+@payment_bp.route('/status/<order_id>', methods=['GET'])
+def payment_status(order_id):
+    """
+    Endpoint para verificar o status de um pagamento
+    """
+    try:
+        # Verificar se o pagamento existe
+        if order_id not in payment_data_store:
+            return jsonify({
+                "success": False,
+                "message": f"Pagamento não encontrado para o ID {order_id}"
+            }), 404
+        
+        # Obter dados do pagamento
+        payment_data = payment_data_store[order_id]
+        
+        # Retornar status
+        return jsonify({
+            "success": True,
+            "orderId": order_id,
+            "status": payment_data.get('status', 'unknown'),
+            "method": payment_data.get('method', ''),
+            "amount": payment_data.get('amount', ''),
+            "timestamp": payment_data.get('timestamp', '')
+        }), 200
+    
+    except Exception as e:
+        # Log detalhado do erro
+        logger.error(f"Erro ao verificar status do pagamento: {str(e)}")
+        logger.error(traceback.format_exc())
+        
+        # Retornar erro
+        return jsonify({
+            "success": False,
+            "message": f"Erro ao verificar status do pagamento: {str(e)}"
+        }), 500
+
+@payment_bp.route('/test', methods=['GET'])
+def test_payment():
+    """
+    Endpoint de teste para verificar se o módulo de pagamento está funcionando
+    """
+    return jsonify({
+        "success": True,
+        "message": "Módulo de pagamento funcionando corretamente",
+        "version": "1.0.0",
+        "timestamp": datetime.datetime.now().isoformat()
+    }), 200

@@ -3,7 +3,7 @@
 
 """
 Aplicação principal do backend Share2Inspire
-Versão ultra-robusta com configuração CORS corrigida para aceitar qualquer origem
+Versão final com configuração CORS corrigida para aceitar share2inspire.pt
 """
 
 import os
@@ -22,12 +22,28 @@ load_dotenv()
 # Criar aplicação Flask
 app = Flask(__name__)
 
-# Configuração CORS ultra-permissiva para resolver problemas de CORS
-CORS(app, 
-     resources={r"/*": {"origins": "*"}}, 
-     supports_credentials=True,
-     allow_headers=["*"],
-     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"])
+# Configuração CORS corrigida para aceitar share2inspire.pt
+CORS(app, resources={
+    r"/api/*": {
+        "origins": [
+            "https://share2inspire.pt",           # Domínio de produção
+            "http://share2inspire.pt",            # Versão HTTP do domínio
+            "https://www.share2inspire.pt",       # Versão www do domínio
+            "http://www.share2inspire.pt",        # Versão HTTP+www do domínio
+            "http://localhost:3000",              # Porta 3000 (comum para React/Node)
+            "http://localhost:5000",              # Porta 5000 (comum para Flask)
+            "http://localhost:5500",              # Porta 5500 (comum para Live Server no VS Code)
+            "http://localhost:8080",              # Porta 8080 (comum para http-server)
+            "http://127.0.0.1:3000",              # Alternativas com IP local
+            "http://127.0.0.1:5000",
+            "http://127.0.0.1:5500",
+            "http://127.0.0.1:8080"
+        ],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+        "supports_credentials": True
+    }
+})
 
 # Configurar chave secreta
 app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24).hex())
@@ -35,11 +51,15 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24).hex())
 # Middleware global para garantir cabeçalhos CORS em todas as respostas
 @app.after_request
 def add_cors_headers(response):
-    # Adicionar cabeçalhos CORS a todas as respostas
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,*')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH,HEAD')
-    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    # Verificar se o cabeçalho já existe antes de adicionar
+    if 'Access-Control-Allow-Origin' not in response.headers:
+        response.headers.add('Access-Control-Allow-Origin', 'https://share2inspire.pt')
+    if 'Access-Control-Allow-Headers' not in response.headers:
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With')
+    if 'Access-Control-Allow-Methods' not in response.headers:
+        response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
+    if 'Access-Control-Allow-Credentials' not in response.headers:
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
     return response
 
 # Função para tratar preflight requests
@@ -48,9 +68,9 @@ def handle_cors_preflight():
     Trata requisições OPTIONS para CORS
     """
     response = jsonify({"success": True})
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,*')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH,HEAD')
+    response.headers.add('Access-Control-Allow-Origin', 'https://share2inspire.pt')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
     response.headers.add('Access-Control-Allow-Credentials', 'true')
     return response, 200
 
