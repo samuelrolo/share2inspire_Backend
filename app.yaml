@@ -1,25 +1,21 @@
 runtime: python311
-entrypoint: gunicorn -b :$PORT main:app
+entrypoint: gunicorn -b :$PORT --workers 1 --threads 8 --timeout 0 main:app
 
+# Variáveis de ambiente para substituir o Secret Manager
 env_variables:
-  FLASK_APP: main.py
-  FLASK_ENV: production
+  FLASK_ENV: "production"
   FLASK_DEBUG: "False"
+  BREVO_API_KEY: "P1g7Ax"
+  IFTHENPAY_GATEWAY_KEY: "3532-9893-7426-5310"
+  IFTHENPAY_MBWAY_KEY: "UWP-547025"  # MBWAY Key
+  IFTHENPAY_PAYSHOP_KEY: "QTU-066969"  # PAYSHOP Key
+  IFTHENPAY_MB_KEY: "BXG-350883"  # MB Key
+  FLASK_SECRET_KEY: "6BgB0lORveVCA/bsnK3XddCBnxvN3+Q8Z8We7cBeWAQ="
+  ANTI_PHISHING_KEY: "SUbOv6HYq8WVAmSEqkLKZvjAhBPsr1LI9ifRXTtrvMs="  # Chave ANTI_PHISHING fornecida
+  IFTHENPAY_CALLBACK_KEY: "test_key_callback"
 
 handlers:
-- url: /api/.*
-  script: auto
-  secure: always
-
+# Esta configuração serve todos os pedidos para a sua aplicação Flask.
 - url: /.*
   script: auto
-  secure: always
-
-automatic_scaling:
-  min_instances: 1
-  max_instances: 5
-  min_idle_instances: 1
-  max_idle_instances: 1
-  min_pending_latency: 30ms
-  max_pending_latency: 100ms
-  max_concurrent_requests: 50
+  secure: always # Força HTTPS
