@@ -1,316 +1,357 @@
-# /home/ubuntu/share2inspire_backend/src/routes/feedback.py
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Módulo de processamento de feedback para Share2Inspire
+Versão final que aceita múltiplos formatos de dados (JSON, FormData, URL params)
+"""
 
 import os
 import json
 import logging
-import sib_api_v3_sdk
-from sib_api_v3_sdk.rest import ApiException
+import requests
 from flask import Blueprint, request, jsonify
-from flask_cors import cross_origin
 from dotenv import load_dotenv
-from cors_fix import handle_cors_preflight
+# Importar handle_cors_preflight do main.py
+from main import handle_cors_preflight
+
+# Carregar variáveis de ambiente
+load_dotenv()
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Carregar variáveis de ambiente do ficheiro .env
-load_dotenv()
+# Criar blueprint
+feedback_bp = Blueprint('feedback', __name__)
 
-feedback_bp = Blueprint("feedback", __name__, url_prefix="/api/feedback")
+# Configurações do Brevo
+BREVO_API_KEY = os.getenv('BREVO_API_KEY')
+BREVO_SENDER_NAME = os.getenv('BREVO_SENDER_NAME', 'Share2Inspire')
+BREVO_SENDER_EMAIL = os.getenv('BREVO_SENDER_EMAIL', 'noreply@share2inspire.pt')
 
-# Configuração da API Brevo (Sendinblue)
-configuration = sib_api_v3_sdk.Configuration()
-api_key = os.getenv("BREVO_API_KEY")
-configuration.api_key["api-key"] = api_key
+def get_request_data():
+    """
+    Função universal para extrair dados do request independentemente do formato
+    Suporta JSON, form-data e query parameters
+    """
+    data = {}
+    
+    # Log detalhado para debug
+    logger.info(f"Content-Type: {request.headers.get('Content-Type', 'não especificado')}")
+    logger.info(f"Request method: {request.method}")
+    
+    # Tentar extrair de JSON
+    if request.is_json:
+        try:
+            json_data = request.get_json(silent=True)
+            if json_data:
+                logger.info("Dados extraídos de JSON")
+                data.update(json_data)
+        except Exception as e:
+            logger.warning(f"Erro ao extrair JSON: {str(e)}")
+    
+    # Tentar extrair de form-data
+    if request.form:
+        logger.info("Dados extraídos de form-data")
+        for key in request.form:
+            data[key] = request.form[key]
+    
+    # Tentar extrair de query parameters
+    if request.args:
+        logger.info("Dados extraídos de query parameters")
+        for key in request.args:
+            data[key] = request.args[key]
+    
+    # Tentar extrair de dados brutos
+    if not data and request.data:
+        try:
+            raw_data = request.data.decode('utf-8')
+            logger.info(f"Dados brutos: {raw_data}")
+            # Tentar parse como JSON
+            try:
+                json_data = json.loads(raw_data)
+                data.update(json_data)
+                logger.info("Dados extraídos de dados brutos como JSON")
+            except json.JSONDecodeError:
+                # Tentar parse como form-urlencoded
+                if '=' in raw_data:
+                    pairs = raw_data.split('&')
+                    for pair in pairs:
+                        if '=' in pair:
+                            key, value = pair.split('=', 1)
+                            data[key] = value
+                    logger.info("Dados extraídos de dados brutos como form-urlencoded")
+        except Exception as e:
+            logger.warning(f"Erro ao processar dados brutos: {str(e)}")
+    
+    # Log dos dados extraídos
+    logger.info(f"Dados extraídos: {data}")
+    
+    return data
 
-# Verificar se a chave API foi carregada
-if not api_key:
-    logger.error("ALERTA: A variável de ambiente BREVO_API_KEY não está definida!")
-else:
-    logger.info("Chave API Brevo configurada com sucesso")
-
-# Email do remetente verificado na Brevo
-VERIFIED_SENDER_EMAIL = os.getenv("BREVO_SENDER_EMAIL", "srshare2inspire@gmail.com")
-VERIFIED_SENDER_NAME = os.getenv("BREVO_SENDER_NAME", "Share2Inspire")
-
-# Email do destinatário (admin)
-ADMIN_EMAIL = "srshare2inspire@gmail.com"
-ADMIN_NAME = "Share2Inspire Admin"
-
-api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
-
-# Adicionar suporte explícito para OPTIONS em todos os endpoints
-@feedback_bp.route("/submit", methods=["POST", "OPTIONS"])
-@cross_origin(origins=["https://share2inspire.pt", "http://localhost:8080", "http://127.0.0.1:8080"], 
-              methods=["GET", "POST", "OPTIONS"], 
-              allow_headers=["Content-Type", "Authorization", "X-Requested-With"])
+@feedback_bp.route('/submit', methods=['GET', 'POST', 'OPTIONS'])
 def submit_feedback():
     """
-    Endpoint para enviar feedback via email usando a API Brevo.
-    Recebe dados do formulário e envia um email transacional para o administrador.
+    Recebe e processa feedback do usuário
+    Aceita múltiplos formatos de dados (JSON, FormData, URL params)
     """
-    # Responder explicitamente a pedidos OPTIONS
-    if request.method == "OPTIONS":
-        return "", 200
-        
+    # Tratamento de CORS para preflight requests
+    if request.method == 'OPTIONS':
+        return handle_cors_preflight()
+    
     try:
-        data = request.get_json()
-        logger.info(f"Dados de feedback recebidos: {json.dumps(data, indent=2)}")
-
-        if not data:
-            logger.warning("Nenhum dado recebido no corpo da requisição")
-            return jsonify({"error": "Nenhum dado recebido"}), 400
-
-        # Validação de campos obrigatórios
-        required_fields = ["rating", "message"]
-        missing_fields = [field for field in required_fields if not data.get(field)]
+        # Log de todos os headers para debug
+        logger.info("Headers recebidos:")
+        for header, value in request.headers.items():
+            logger.info(f"{header}: {value}")
+        
+        # Obter dados do request usando a função universal
+        data = get_request_data()
+        
+        # Validar dados obrigatórios
+        required_fields = ['name', 'email', 'message']
+        missing_fields = []
+        
+        for field in required_fields:
+            if field not in data:
+                missing_fields.append(field)
         
         if missing_fields:
-            logger.warning(f"Campos obrigatórios em falta: {', '.join(missing_fields)}")
+            logger.error(f"Campos obrigatórios ausentes: {', '.join(missing_fields)}")
             return jsonify({
-                "error": f"Campos obrigatórios em falta: {', '.join(missing_fields)}",
-                "status": "error"
+                "success": False, 
+                "error": f"Campos obrigatórios em falta: {', '.join(missing_fields)}"
             }), 400
-
-        rating = data.get("rating")
-        message = data.get("message")
-        user_email = data.get("email", "Não fornecido")
-        user_name = data.get("name", "Utilizador Anónimo")
-
-        # Construir o email com formato melhorado
-        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-            to=[{"email": ADMIN_EMAIL, "name": ADMIN_NAME}],
-            sender={"email": VERIFIED_SENDER_EMAIL, "name": VERIFIED_SENDER_NAME},
-            subject="Novo Feedback Recebido - Share2Inspire",
-            html_content=f"""
-            <html>
-            <head>
-                <style>
-                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                    h2 {{ color: #BF9A33; border-bottom: 1px solid #eee; padding-bottom: 10px; }}
-                    .rating {{ font-size: 18px; font-weight: bold; margin: 15px 0; }}
-                    .message {{ background-color: #f9f9f9; padding: 15px; border-left: 4px solid #BF9A33; }}
-                    .footer {{ margin-top: 30px; font-size: 12px; color: #777; }}
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <h2>Novo Feedback Recebido</h2>
-                    <p><strong>De:</strong> {user_name} ({user_email})</p>
-                    <p><strong>Data:</strong> {{"{{date}}"}}</p>
-                    <div class="rating">
-                        <p><strong>Avaliação:</strong> {rating} estrelas</p>
-                    </div>
-                    <div class="message">
-                        <p><strong>Mensagem:</strong></p>
-                        <p>{message}</p>
-                    </div>
-                    <div class="footer">
-                        <p>Este email foi enviado automaticamente pelo sistema Share2Inspire.</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """,
-            # Adicionar opções de rastreamento
-            params={"date": "{{date}}"},
-            headers={"Some-Custom-Header": "feedback-notification"},
-            # Configurar reply-to para o email do utilizador se fornecido
-            reply_to={"email": user_email, "name": user_name} if user_email != "Não fornecido" else None
-        )
-
-        # Enviar o email
-        logger.info("A enviar email de feedback via Brevo API")
-        api_response = api_instance.send_transac_email(send_smtp_email)
-        logger.info(f"Email enviado com sucesso. ID da mensagem: {api_response.message_id}")
         
-        return jsonify({
-            "message": "Feedback enviado com sucesso!",
-            "status": "success",
-            "messageId": api_response.message_id
-        }), 200
+        # Extrair dados
+        name = data.get('name', '')
+        email = data.get('email', '')
+        message = data.get('message', '')
+        subject = data.get('subject', 'Feedback do Site')
+        rating = data.get('rating', 5)  # Valor padrão de 5 estrelas se não for fornecido
         
-    except ApiException as e:
-        # Tratamento específico de erros da API Brevo
-        error_body = getattr(e, 'body', str(e))
-        error_status = getattr(e, 'status', 500)
+        # Garantir que rating é um número
+        try:
+            rating = int(rating)
+        except (ValueError, TypeError):
+            rating = 5  # Valor padrão se a conversão falhar
         
-        logger.error(f"Erro na API Brevo: Status {error_status}, Corpo: {error_body}")
+        # Enviar email com o feedback
+        success = send_feedback_email(name, email, subject, message, rating)
         
-        # Mapear códigos de erro comuns para mensagens amigáveis
-        error_messages = {
-            400: "Dados inválidos no pedido. Verifique os campos e tente novamente.",
-            401: "Erro de autenticação com a API Brevo. Verifique a chave API.",
-            403: "Acesso negado à API Brevo. Verifique as permissões da chave API.",
-            429: "Limite de envios excedido. Tente novamente mais tarde.",
-            500: "Erro no servidor Brevo. Tente novamente mais tarde."
-        }
-        
-        user_message = error_messages.get(error_status, "Ocorreu um erro ao enviar o feedback. Tente novamente mais tarde.")
-        
-        return jsonify({
-            "error": user_message,
-            "status": "error",
-            "details": str(error_body) if os.getenv("FLASK_ENV") == "development" else None
-        }), error_status
-        
+        if success:
+            return jsonify({
+                "success": True,
+                "message": "Feedback enviado com sucesso. Obrigado pelo seu contacto!"
+            }), 200
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Erro ao enviar feedback. Por favor, tente novamente mais tarde."
+            }), 500
+            
     except Exception as e:
-        # Tratamento genérico de outros erros
-        logger.exception(f"Erro inesperado ao processar feedback: {str(e)}")
-        
+        logger.exception(f"Erro ao processar feedback: {str(e)}")
         return jsonify({
-            "error": "Ocorreu um erro inesperado ao processar o seu feedback. Por favor, tente novamente mais tarde.",
-            "status": "error"
+            "success": False, 
+            "error": f"Erro ao processar feedback: {str(e)}"
         }), 500
 
-@feedback_bp.route("/newsletter", methods=["POST", "OPTIONS"])
-@cross_origin(origins=["https://share2inspire.pt", "http://localhost:8080", "http://127.0.0.1:8080"], 
-              methods=["GET", "POST", "OPTIONS"], 
-              allow_headers=["Content-Type", "Authorization", "X-Requested-With"])
-def submit_newsletter():
+@feedback_bp.route('/contact', methods=['GET', 'POST', 'OPTIONS'])
+def contact():
     """
-    Endpoint para inscrição na newsletter via email usando a API Brevo.
-    Recebe dados do formulário e envia um email de confirmação.
+    Recebe e processa mensagens de contacto
+    Aceita múltiplos formatos de dados (JSON, FormData, URL params)
     """
-    # Responder explicitamente a pedidos OPTIONS
-    if request.method == "OPTIONS":
-        return "", 200
-        
+    # Tratamento de CORS para preflight requests
+    if request.method == 'OPTIONS':
+        return handle_cors_preflight()
+    
     try:
-        data = request.get_json()
-        logger.info(f"Dados de newsletter recebidos: {json.dumps(data, indent=2)}")
-
-        if not data:
-            logger.warning("Nenhum dado recebido no corpo da requisição")
-            return jsonify({"error": "Nenhum dado recebido"}), 400
-
-        # Validação de campos obrigatórios
-        required_fields = ["email"]
-        missing_fields = [field for field in required_fields if not data.get(field)]
+        # Log de todos os headers para debug
+        logger.info("Headers recebidos:")
+        for header, value in request.headers.items():
+            logger.info(f"{header}: {value}")
+        
+        # Obter dados do request usando a função universal
+        data = get_request_data()
+        
+        # Validar dados obrigatórios
+        required_fields = ['name', 'email', 'message']
+        missing_fields = []
+        
+        for field in required_fields:
+            if field not in data:
+                missing_fields.append(field)
         
         if missing_fields:
-            logger.warning(f"Campos obrigatórios em falta: {', '.join(missing_fields)}")
+            logger.error(f"Campos obrigatórios ausentes: {', '.join(missing_fields)}")
             return jsonify({
-                "error": f"Campos obrigatórios em falta: {', '.join(missing_fields)}",
-                "status": "error"
+                "success": False, 
+                "error": f"Campos obrigatórios em falta: {', '.join(missing_fields)}"
             }), 400
-
-        user_email = data.get("email")
-        user_name = data.get("name", "Subscritor")
-
-        # Construir o email de confirmação para o administrador
-        admin_email = sib_api_v3_sdk.SendSmtpEmail(
-            to=[{"email": ADMIN_EMAIL, "name": ADMIN_NAME}],
-            sender={"email": VERIFIED_SENDER_EMAIL, "name": VERIFIED_SENDER_NAME},
-            subject="Nova Subscrição de Newsletter - Share2Inspire",
-            html_content=f"""
-            <html>
-            <head>
-                <style>
-                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                    h2 {{ color: #BF9A33; border-bottom: 1px solid #eee; padding-bottom: 10px; }}
-                    .footer {{ margin-top: 30px; font-size: 12px; color: #777; }}
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <h2>Nova Subscrição de Newsletter</h2>
-                    <p><strong>De:</strong> {user_name} ({user_email})</p>
-                    <p><strong>Data:</strong> {{"{{date}}"}}</p>
-                    <div class="footer">
-                        <p>Este email foi enviado automaticamente pelo sistema Share2Inspire.</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """,
-            params={"date": "{{date}}"},
-            headers={"Some-Custom-Header": "newsletter-subscription"}
-        )
-
-        # Enviar o email para o administrador
-        logger.info("A enviar notificação de newsletter via Brevo API")
-        api_response = api_instance.send_transac_email(admin_email)
-        logger.info(f"Email enviado com sucesso. ID da mensagem: {api_response.message_id}")
         
-        # Construir o email de confirmação para o utilizador
-        user_email_confirmation = sib_api_v3_sdk.SendSmtpEmail(
-            to=[{"email": user_email, "name": user_name}],
-            sender={"email": VERIFIED_SENDER_EMAIL, "name": VERIFIED_SENDER_NAME},
-            subject="Confirmação de Subscrição - Newsletter Share2Inspire",
-            html_content=f"""
-            <html>
-            <head>
-                <style>
-                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                    h2 {{ color: #BF9A33; border-bottom: 1px solid #eee; padding-bottom: 10px; }}
-                    .message {{ background-color: #f9f9f9; padding: 15px; border-left: 4px solid #BF9A33; }}
-                    .footer {{ margin-top: 30px; font-size: 12px; color: #777; }}
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <h2>Subscrição Confirmada!</h2>
-                    <p>Olá {user_name},</p>
-                    <div class="message">
-                        <p>Obrigado por subscrever a nossa newsletter. A partir de agora, receberá as nossas novidades e atualizações diretamente no seu email.</p>
-                    </div>
-                    <p>Se não solicitou esta subscrição, por favor ignore este email.</p>
-                    <div class="footer">
-                        <p>Este email foi enviado automaticamente pelo sistema Share2Inspire.</p>
-                        <p>© {{"{{year}}"}} Share2Inspire. Todos os direitos reservados.</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """,
-            params={"year": "{{year}}"},
-            headers={"Some-Custom-Header": "newsletter-confirmation"}
-        )
-
-        # Enviar o email de confirmação para o utilizador
-        api_response_user = api_instance.send_transac_email(user_email_confirmation)
-        logger.info(f"Email de confirmação enviado com sucesso. ID da mensagem: {api_response_user.message_id}")
+        # Extrair dados
+        name = data.get('name', '')
+        email = data.get('email', '')
+        message = data.get('message', '')
+        subject = data.get('subject', 'Contacto do Site')
         
-        return jsonify({
-            "message": "Subscrição realizada com sucesso!",
-            "status": "success",
-            "messageId": api_response.message_id
-        }), 200
+        # Enviar email com a mensagem de contacto
+        success = send_contact_email(name, email, subject, message)
         
-    except ApiException as e:
-        # Tratamento específico de erros da API Brevo
-        error_body = getattr(e, 'body', str(e))
-        error_status = getattr(e, 'status', 500)
-        
-        logger.error(f"Erro na API Brevo: Status {error_status}, Corpo: {error_body}")
-        
-        # Mapear códigos de erro comuns para mensagens amigáveis
-        error_messages = {
-            400: "Dados inválidos no pedido. Verifique os campos e tente novamente.",
-            401: "Erro de autenticação com a API Brevo. Verifique a chave API.",
-            403: "Acesso negado à API Brevo. Verifique as permissões da chave API.",
-            429: "Limite de envios excedido. Tente novamente mais tarde.",
-            500: "Erro no servidor Brevo. Tente novamente mais tarde."
-        }
-        
-        user_message = error_messages.get(error_status, "Ocorreu um erro ao processar a sua subscrição. Tente novamente mais tarde.")
-        
-        return jsonify({
-            "error": user_message,
-            "status": "error",
-            "details": str(error_body) if os.getenv("FLASK_ENV") == "development" else None
-        }), error_status
-        
+        if success:
+            return jsonify({
+                "success": True,
+                "message": "Mensagem enviada com sucesso. Entraremos em contacto brevemente!"
+            }), 200
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Erro ao enviar mensagem. Por favor, tente novamente mais tarde."
+            }), 500
+            
     except Exception as e:
-        # Tratamento genérico de outros erros
-        logger.exception(f"Erro inesperado ao processar subscrição de newsletter: {str(e)}")
-        
+        logger.exception(f"Erro ao processar contacto: {str(e)}")
         return jsonify({
-            "error": "Ocorreu um erro inesperado ao processar a sua subscrição. Por favor, tente novamente mais tarde.",
-            "status": "error"
+            "success": False, 
+            "error": f"Erro ao processar contacto: {str(e)}"
         }), 500
+
+def send_feedback_email(name, email, subject, message, rating):
+    """
+    Envia email com o feedback recebido
+    """
+    try:
+        logger.info(f"Enviando email de feedback de {email}")
+        
+        # Construir conteúdo do email
+        email_subject = f"Novo Feedback: {subject}"
+        email_content = f"""
+        <h2>Novo Feedback Recebido</h2>
+        <p><strong>Nome:</strong> {name}</p>
+        <p><strong>Email:</strong> {email}</p>
+        <p><strong>Assunto:</strong> {subject}</p>
+        <p><strong>Avaliação:</strong> {rating} estrelas</p>
+        <p><strong>Mensagem:</strong></p>
+        <p>{message}</p>
+        """
+        
+        # Em produção, enviar email real via Brevo API
+        if BREVO_API_KEY:
+            url = "https://api.brevo.com/v3/smtp/email"
+            headers = {
+                "accept": "application/json",
+                "api-key": BREVO_API_KEY,
+                "content-type": "application/json"
+            }
+            payload = {
+                "sender": {
+                    "name": BREVO_SENDER_NAME,
+                    "email": BREVO_SENDER_EMAIL
+                },
+                "to": [
+                    {
+                        "email": "srshare2inspire@gmail.com",
+                        "name": "Share2Inspire"
+                    }
+                ],
+                "replyTo": {
+                    "email": email,
+                    "name": name
+                },
+                "subject": email_subject,
+                "htmlContent": email_content
+            }
+            
+            response = requests.post(url, headers=headers, json=payload)
+            
+            if response.status_code == 201:
+                logger.info("Email de feedback enviado com sucesso")
+                return True
+            else:
+                logger.error(f"Erro ao enviar email de feedback: {response.text}")
+                return False
+        else:
+            # Simulação para ambiente de desenvolvimento
+            logger.info(f"Email de feedback simulado: {email_subject}")
+            logger.info(f"Conteúdo: {email_content}")
+            return True
+            
+    except Exception as e:
+        logger.exception(f"Erro ao enviar email de feedback: {str(e)}")
+        return False
+
+def send_contact_email(name, email, subject, message):
+    """
+    Envia email com a mensagem de contacto
+    """
+    try:
+        logger.info(f"Enviando email de contacto de {email}")
+        
+        # Construir conteúdo do email
+        email_subject = f"Nova Mensagem: {subject}"
+        email_content = f"""
+        <h2>Nova Mensagem Recebida</h2>
+        <p><strong>Nome:</strong> {name}</p>
+        <p><strong>Email:</strong> {email}</p>
+        <p><strong>Assunto:</strong> {subject}</p>
+        <p><strong>Mensagem:</strong></p>
+        <p>{message}</p>
+        """
+        
+        # Em produção, enviar email real via Brevo API
+        if BREVO_API_KEY:
+            url = "https://api.brevo.com/v3/smtp/email"
+            headers = {
+                "accept": "application/json",
+                "api-key": BREVO_API_KEY,
+                "content-type": "application/json"
+            }
+            payload = {
+                "sender": {
+                    "name": BREVO_SENDER_NAME,
+                    "email": BREVO_SENDER_EMAIL
+                },
+                "to": [
+                    {
+                        "email": "srshare2inspire@gmail.com",
+                        "name": "Share2Inspire"
+                    }
+                ],
+                "replyTo": {
+                    "email": email,
+                    "name": name
+                },
+                "subject": email_subject,
+                "htmlContent": email_content
+            }
+            
+            response = requests.post(url, headers=headers, json=payload)
+            
+            if response.status_code == 201:
+                logger.info("Email de contacto enviado com sucesso")
+                return True
+            else:
+                logger.error(f"Erro ao enviar email de contacto: {response.text}")
+                return False
+        else:
+            # Simulação para ambiente de desenvolvimento
+            logger.info(f"Email de contacto simulado: {email_subject}")
+            logger.info(f"Conteúdo: {email_content}")
+            return True
+            
+    except Exception as e:
+        logger.exception(f"Erro ao enviar email de contacto: {str(e)}")
+        return False
+
+@feedback_bp.route('/test', methods=['GET'])
+def test_feedback():
+    """
+    Endpoint de teste para verificar se o módulo de feedback está funcionando
+    """
+    return jsonify({
+        "success": True,
+        "message": "Módulo de feedback está funcionando corretamente"
+    }), 200
