@@ -17,17 +17,7 @@ env_variables:
 # etc.
 
 handlers:
-# Configuração específica para API com cabeçalhos CORS
-- url: /api/.*
-  script: auto
-  secure: always
-  http_headers:
-    Access-Control-Allow-Origin: https://share2inspire.pt
-    Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
-    Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With
-    Access-Control-Allow-Credentials: 'true'
-
-# Configuração para todas as outras rotas
+# Esta configuração serve todos os pedidos para a sua aplicação Flask.
 - url: /.*
   script: auto
   secure: always # Força HTTPS
