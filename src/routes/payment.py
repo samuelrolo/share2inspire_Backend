@@ -1,5 +1,4 @@
 # /home/ubuntu/share2inspire_Backend/src/payment.py
-
 import os
 import json
 import uuid
@@ -34,7 +33,6 @@ BREVO_SENDER_EMAIL = os.getenv("BREVO_SENDER_EMAIL", "srshare2inspire@gmail.com"
 # Verificar configurações
 if not all([IFTHENPAY_MBWAY_KEY, IFTHENPAY_MB_KEY, IFTHENPAY_PAYSHOP_KEY]):
     logger.error("Configurações Ifthenpay incompletas. Verifique as variáveis de ambiente.")
-
 if not BREVO_API_KEY:
     logger.error("Configuração Brevo incompleta. Verifique a variável de ambiente BREVO_API_KEY.")
 
@@ -53,15 +51,15 @@ def initiate_payment():
     # Tratar pedidos OPTIONS para CORS
     if request.method == "OPTIONS":
         return jsonify({"success": True}), 200
-        
+    
     try:
         data = request.get_json()
         logger.info(f"Dados de pagamento recebidos: {json.dumps(data, indent=2)}")
-
+        
         if not data:
             logger.warning("Nenhum dado recebido no corpo da requisição")
             return jsonify({"error": "Nenhum dado recebido", "success": False}), 400
-
+            
         # Validação de campos obrigatórios
         required_fields = ["paymentMethod", "amount", "orderId"]
         missing_fields = [field for field in required_fields if not data.get(field)]
@@ -72,7 +70,7 @@ def initiate_payment():
                 "error": f"Campos obrigatórios em falta: {', '.join(missing_fields)}",
                 "success": False
             }), 400
-
+            
         payment_method = data.get("paymentMethod", "mb").lower()
         amount = float(data.get("amount", 0))
         order_id = data.get("orderId", f"ORDER_{uuid.uuid4().hex[:8]}")
@@ -81,7 +79,7 @@ def initiate_payment():
         if amount <= 0:
             logger.warning(f"Valor inválido: {amount}")
             return jsonify({"error": "Valor de pagamento inválido", "success": False}), 400
-
+            
         # Processar pagamento com base no método
         if payment_method == "mb" or payment_method == "multibanco":
             return create_multibanco_reference(data, amount, order_id)
@@ -146,6 +144,7 @@ def create_multibanco_reference(data, amount, order_id):
                 "appointmentTime": data.get("time", ""),
                 "status": "pending"
             }
+            
             save_payment_data(order_id, "multibanco", amount, payment_data)
             
             return jsonify({
@@ -178,11 +177,11 @@ def create_mbway_payment(data, amount, order_id):
         if not phone or len(phone) < 9:
             logger.warning(f"Número de telefone inválido para MB WAY: {phone}")
             return jsonify({"error": "Número de telefone inválido para MB WAY", "success": False}), 400
-        
+            
         # Formatar telefone (adicionar prefixo +351 se não existir)
         if not phone.startswith("+"):
             phone = f"+351{phone}"
-        
+            
         # Preparar dados para API Ifthenpay (atualizado para a nova API)
         payload = {
             "mbWayKey": IFTHENPAY_MBWAY_KEY,
@@ -221,16 +220,19 @@ def create_mbway_payment(data, amount, order_id):
                 "appointmentTime": data.get("time", ""),
                 "status": "pending"
             }
+            
             save_payment_data(order_id, "mbway", amount, payment_data)
+            
+            # Construir URL de redirecionamento para página de sucesso
+            redirect_url = f"/pages/pagamento-sucesso.html?duration={data.get('duration', '30')}&amount={amount}&date={data.get('date', '')}&format={data.get('format', 'Online')}&reference={result.get('RequestId')}&method=mbway"
             
             return jsonify({
                 "success": True,
                 "method": "mbway",
-                "reference": result.get("RequestId"),
+                "requestId": result.get("RequestId"),
                 "amount": amount,
                 "orderId": order_id,
-                "phone": phone,
-                "status": result.get("Status")
+                "redirect": redirect_url
             }), 200
         else:
             logger.error(f"Erro ao criar pagamento MB WAY: {response.status_code} - {response.text}")
@@ -249,12 +251,13 @@ def create_payshop_reference(data, amount, order_id):
     Cria uma referência Payshop para pagamento
     """
     try:
-        # Preparar dados para API Ifthenpay (atualizado para a nova API)
+        # Preparar dados para API Ifthenpay
         payload = {
             "payshopKey": IFTHENPAY_PAYSHOP_KEY,
-            "id": order_id,
-            "valor": amount,
-            "validade": data.get("validDays", "")  # Formato YYYYMMDD ou vazio
+            "orderId": order_id,
+            "amount": amount,
+            "description": data.get("description", f"Pagamento Share2Inspire #{order_id}"),
+            "validDays": data.get("validDays", 30)  # Validade padrão de 30 dias
         }
         
         # Enviar requisição para API Ifthenpay
@@ -283,9 +286,10 @@ def create_payshop_reference(data, amount, order_id):
                 "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "appointmentDate": data.get("date", ""),
                 "appointmentTime": data.get("time", ""),
-                "validity": result.get("ExpiryDate", ""),
+                "validUntil": result.get("ValidUntil"),
                 "status": "pending"
             }
+            
             save_payment_data(order_id, "payshop", amount, payment_data)
             
             return jsonify({
@@ -294,7 +298,7 @@ def create_payshop_reference(data, amount, order_id):
                 "reference": result.get("Reference"),
                 "amount": amount,
                 "orderId": order_id,
-                "validity": result.get("ExpiryDate", "")
+                "validUntil": result.get("ValidUntil")
             }), 200
         else:
             logger.error(f"Erro ao criar referência Payshop: {response.status_code} - {response.text}")
@@ -308,7 +312,7 @@ def create_payshop_reference(data, amount, order_id):
         logger.exception(f"Erro ao criar referência Payshop: {str(e)}")
         return jsonify({"error": "Erro ao gerar referência Payshop", "success": False}), 500
 
-@payment_bp.route("/callback", methods=["POST", "OPTIONS"])
+@payment_bp.route("/callback", methods=["GET", "POST", "OPTIONS"])
 @cross_origin()
 def payment_callback():
     """
@@ -319,248 +323,183 @@ def payment_callback():
         return jsonify({"success": True}), 200
         
     try:
-        data = request.get_json()
+        # Obter dados do callback
+        if request.method == "GET":
+            data = request.args.to_dict()
+        else:
+            data = request.get_json() or request.form.to_dict()
+            
         logger.info(f"Callback de pagamento recebido: {json.dumps(data, indent=2)}")
-
+        
+        # Validar dados do callback
         if not data:
             logger.warning("Nenhum dado recebido no callback")
             return jsonify({"error": "Nenhum dado recebido"}), 400
-
-        # Validar callback com chave anti-phishing
-        if IFTHENPAY_CALLBACK_SECRET:
-            received_secret = data.get("callbackSecret")
-            if received_secret != IFTHENPAY_CALLBACK_SECRET:
-                logger.warning(f"Chave anti-phishing inválida: {received_secret}")
-                return jsonify({"error": "Chave anti-phishing inválida"}), 403
-
-        # Extrair dados do callback
-        payment_method = data.get("type", "unknown").lower()
-        order_id = data.get("orderId")
-        reference = data.get("reference") or data.get("referenceId") or data.get("RequestId")
-        amount = data.get("amount") or data.get("Amount")
-        status = data.get("status", "unknown").lower()
-        
-        # Validar dados mínimos
-        if not all([order_id, reference, amount]):
-            logger.warning("Dados de callback incompletos")
-            return jsonify({"error": "Dados de callback incompletos"}), 400
-        
-        # Processar pagamento com base no status
-        if status == "paid" or status == "completed" or status == "000":
-            # Atualizar status do pagamento
-            update_payment_status(order_id, "paid")
             
-            # Enviar email de confirmação ao cliente
-            send_payment_confirmation_email(order_id)
-            
-            logger.info(f"Pagamento {payment_method} confirmado para pedido {order_id}")
-            return jsonify({"success": True, "message": "Pagamento processado com sucesso"}), 200
+        # Processar callback com base no método de pagamento
+        payment_method = data.get("payment_type", "").lower()
+        
+        if payment_method == "mbway":
+            return process_mbway_callback(data)
+        elif payment_method == "mb" or payment_method == "multibanco":
+            return process_multibanco_callback(data)
+        elif payment_method == "payshop":
+            return process_payshop_callback(data)
         else:
-            logger.warning(f"Status de pagamento não reconhecido: {status}")
-            return jsonify({"success": False, "message": f"Status não processado: {status}"}), 200
+            logger.warning(f"Método de pagamento não reconhecido no callback: {payment_method}")
+            return jsonify({"error": "Método de pagamento não reconhecido"}), 400
             
     except Exception as e:
         logger.exception(f"Erro ao processar callback de pagamento: {str(e)}")
         return jsonify({"error": "Erro ao processar callback"}), 500
 
+def process_mbway_callback(data):
+    """
+    Processa callback de pagamento MB WAY
+    """
+    try:
+        # Validar dados do callback
+        required_fields = ["requestId", "status"]
+        missing_fields = [field for field in required_fields if not data.get(field)]
+        
+        if missing_fields:
+            logger.warning(f"Campos obrigatórios em falta no callback MB WAY: {', '.join(missing_fields)}")
+            return jsonify({
+                "error": f"Campos obrigatórios em falta: {', '.join(missing_fields)}"
+            }), 400
+            
+        request_id = data.get("requestId")
+        status = data.get("status")
+        
+        # Atualizar status do pagamento (em produção, atualizar no banco de dados)
+        # Aqui, apenas logamos a informação
+        logger.info(f"Atualizando status do pagamento MB WAY {request_id} para {status}")
+        
+        # Em produção, enviar email de confirmação ao cliente
+        
+        return jsonify({
+            "success": True,
+            "message": "Callback processado com sucesso"
+        }), 200
+        
+    except Exception as e:
+        logger.exception(f"Erro ao processar callback MB WAY: {str(e)}")
+        return jsonify({"error": "Erro ao processar callback MB WAY"}), 500
+
+def process_multibanco_callback(data):
+    """
+    Processa callback de pagamento Multibanco
+    """
+    try:
+        # Validar dados do callback
+        required_fields = ["reference", "entity", "status"]
+        missing_fields = [field for field in required_fields if not data.get(field)]
+        
+        if missing_fields:
+            logger.warning(f"Campos obrigatórios em falta no callback Multibanco: {', '.join(missing_fields)}")
+            return jsonify({
+                "error": f"Campos obrigatórios em falta: {', '.join(missing_fields)}"
+            }), 400
+            
+        reference = data.get("reference")
+        entity = data.get("entity")
+        status = data.get("status")
+        
+        # Atualizar status do pagamento (em produção, atualizar no banco de dados)
+        # Aqui, apenas logamos a informação
+        logger.info(f"Atualizando status do pagamento Multibanco {entity}/{reference} para {status}")
+        
+        # Em produção, enviar email de confirmação ao cliente
+        
+        return jsonify({
+            "success": True,
+            "message": "Callback processado com sucesso"
+        }), 200
+        
+    except Exception as e:
+        logger.exception(f"Erro ao processar callback Multibanco: {str(e)}")
+        return jsonify({"error": "Erro ao processar callback Multibanco"}), 500
+
+def process_payshop_callback(data):
+    """
+    Processa callback de pagamento Payshop
+    """
+    try:
+        # Validar dados do callback
+        required_fields = ["reference", "status"]
+        missing_fields = [field for field in required_fields if not data.get(field)]
+        
+        if missing_fields:
+            logger.warning(f"Campos obrigatórios em falta no callback Payshop: {', '.join(missing_fields)}")
+            return jsonify({
+                "error": f"Campos obrigatórios em falta: {', '.join(missing_fields)}"
+            }), 400
+            
+        reference = data.get("reference")
+        status = data.get("status")
+        
+        # Atualizar status do pagamento (em produção, atualizar no banco de dados)
+        # Aqui, apenas logamos a informação
+        logger.info(f"Atualizando status do pagamento Payshop {reference} para {status}")
+        
+        # Em produção, enviar email de confirmação ao cliente
+        
+        return jsonify({
+            "success": True,
+            "message": "Callback processado com sucesso"
+        }), 200
+        
+    except Exception as e:
+        logger.exception(f"Erro ao processar callback Payshop: {str(e)}")
+        return jsonify({"error": "Erro ao processar callback Payshop"}), 500
+
 @payment_bp.route("/status/<order_id>", methods=["GET", "OPTIONS"])
 @cross_origin()
 def payment_status(order_id):
     """
-    Verifica o status de um pagamento
+    Endpoint para verificar o status de um pagamento
     """
     # Tratar pedidos OPTIONS para CORS
     if request.method == "OPTIONS":
         return jsonify({"success": True}), 200
         
     try:
-        # Obter dados do pagamento
-        payment = get_payment_by_order_id(order_id)
+        # Em produção, buscar status do pagamento no banco de dados
+        # Aqui, apenas retornamos um status fictício
+        logger.info(f"Verificando status do pagamento {order_id}")
         
-        if not payment:
-            return jsonify({
-                "success": False,
-                "error": "Pagamento não encontrado"
-            }), 404
+        # Simular busca de dados
+        payment_data = {
+            "orderId": order_id,
+            "status": "pending",  # Em produção, buscar status real
+            "method": "mbway",
+            "amount": 30.0,
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
         
         return jsonify({
             "success": True,
-            "payment": payment
+            "orderId": order_id,
+            "status": payment_data.get("status"),
+            "method": payment_data.get("method"),
+            "amount": payment_data.get("amount"),
+            "date": payment_data.get("date")
         }), 200
-            
+        
     except Exception as e:
-        logger.exception(f"Erro ao consultar status do pagamento: {str(e)}")
-        return jsonify({"error": "Erro ao consultar status do pagamento", "success": False}), 500
-
-# Implementação de armazenamento temporário em memória (substituir por banco de dados em produção)
-payment_storage = {}
+        logger.exception(f"Erro ao verificar status do pagamento: {str(e)}")
+        return jsonify({"error": "Erro ao verificar status do pagamento", "success": False}), 500
 
 def save_payment_data(order_id, method, amount, data):
     """
     Salva dados do pagamento
-    Em produção, substituir por armazenamento em banco de dados
+    Em produção, salvar em banco de dados
     """
-    logger.info(f"Salvando dados de pagamento para pedido {order_id}")
-    payment_storage[order_id] = data
-
-def update_payment_status(order_id, status):
-    """
-    Atualiza status do pagamento
-    Em produção, substituir por atualização em banco de dados
-    """
-    logger.info(f"Atualizando status do pagamento para pedido {order_id}: {status}")
-    if order_id in payment_storage:
-        payment_storage[order_id]["status"] = status
-        return True
-    return False
-
-def get_payment_by_order_id(order_id):
-    """
-    Obtém dados do pagamento pelo ID do pedido
-    Em produção, substituir por consulta em banco de dados
-    """
-    return payment_storage.get(order_id)
-
-def send_payment_confirmation_email(order_id):
-    """
-    Envia email de confirmação de pagamento usando a API Brevo
-    """
-    try:
-        # Obter dados do pagamento
-        payment_data = get_payment_by_order_id(order_id)
-        
-        if not payment_data:
-            logger.warning(f"Dados de pagamento não encontrados para pedido {order_id}")
-            return False
-            
-        # Verificar se há email do cliente
-        customer_email = payment_data.get("customerEmail")
-        if not customer_email:
-            logger.warning(f"Email do cliente não encontrado para pedido {order_id}")
-            return False
-            
-        # Configurar email usando Brevo
-        url = "https://api.brevo.com/v3/smtp/email"
-        
-        headers = {
-            "accept": "application/json",
-            "api-key": BREVO_API_KEY,
-            "content-type": "application/json"
-        }
-        
-        # Formatar data de pagamento
-        payment_date = payment_data.get("date", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        
-        # Formatar data e hora da marcação
-        appointment_date = payment_data.get("appointmentDate", "")
-        appointment_time = payment_data.get("appointmentTime", "")
-        
-        # Formatar data da marcação para exibição
-        formatted_appointment_date = ""
-        if appointment_date:
-            try:
-                date_obj = datetime.strptime(appointment_date, "%Y-%m-%d")
-                formatted_appointment_date = date_obj.strftime("%d/%m/%Y")
-            except:
-                formatted_appointment_date = appointment_date
-        
-        # Determinar método de pagamento em português
-        payment_method_pt = {
-            "multibanco": "Multibanco",
-            "mbway": "MB WAY",
-            "payshop": "Payshop"
-        }.get(payment_data.get("method", ""), "Desconhecido")
-        
-        # Dados do email
-        payload = {
-            "sender": {
-                "name": BREVO_SENDER_NAME,
-                "email": BREVO_SENDER_EMAIL
-            },
-            "to": [
-                {
-                    "email": customer_email,
-                    "name": payment_data.get("customerName", "Cliente")
-                }
-            ],
-            "subject": "Confirmação de Pagamento - Share2Inspire",
-            "htmlContent": f"""
-                <html>
-                <head>
-                    <style>
-                        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                        .header {{ background-color: #4CAF50; color: white; padding: 10px; text-align: center; }}
-                        .content {{ padding: 20px; background-color: #f9f9f9; }}
-                        .footer {{ text-align: center; margin-top: 20px; font-size: 12px; color: #777; }}
-                        table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
-                        th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }}
-                        th {{ background-color: #f2f2f2; }}
-                    </style>
-                </head>
-                <body>
-                    <div class="container">
-                        <div class="header">
-                            <h2>Confirmação de Pagamento</h2>
-                        </div>
-                        <div class="content">
-                            <p>Caro(a) {payment_data.get('customerName', 'Cliente')},</p>
-                            
-                            <p>O seu pagamento foi processado com <strong>sucesso</strong>!</p>
-                            
-                            <h3>Detalhes da Marcação:</h3>
-                            <table>
-                                <tr>
-                                    <th>Serviço:</th>
-                                    <td>{payment_data.get('description', 'Serviço Share2Inspire')}</td>
-                                </tr>
-                                <tr>
-                                    <th>Valor:</th>
-                                    <td>{payment_data.get('amount', 0)}€</td>
-                                </tr>
-                                <tr>
-                                    <th>Data do Pagamento:</th>
-                                    <td>{payment_date}</td>
-                                </tr>
-                                <tr>
-                                    <th>Método de Pagamento:</th>
-                                    <td>{payment_method_pt}</td>
-                                </tr>
-                                <tr>
-                                    <th>Referência:</th>
-                                    <td>{payment_data.get('reference', 'N/A')}</td>
-                                </tr>
-                                {"<tr><th>Data da Marcação:</th><td>" + formatted_appointment_date + "</td></tr>" if formatted_appointment_date else ""}
-                                {"<tr><th>Hora da Marcação:</th><td>" + appointment_time + "</td></tr>" if appointment_time else ""}
-                            </table>
-                            
-                            <p>Obrigado por escolher a Share2Inspire. Estamos ansiosos para o servir!</p>
-                            
-                            <p>Se tiver alguma dúvida, não hesite em contactar-nos.</p>
-                            
-                            <p>Com os melhores cumprimentos,<br>
-                            Equipa Share2Inspire</p>
-                        </div>
-                        <div class="footer">
-                            <p>© 2025 Share2Inspire. Todos os direitos reservados.</p>
-                            <p>Este é um email automático, por favor não responda.</p>
-                        </div>
-                    </div>
-                </body>
-                </html>
-            """
-        }
-        
-        # Enviar email
-        response = requests.post(url, json=payload, headers=headers)
-        
-        if response.status_code == 201:
-            logger.info(f"Email de confirmação enviado com sucesso para pedido {order_id}")
-            return True
-        else:
-            logger.error(f"Erro ao enviar email de confirmação: {response.status_code} - {response.text}")
-            return False
-            
-    except Exception as e:
-        logger.exception(f"Erro ao enviar email de confirmação: {str(e)}")
-        return False
+    # Aqui, apenas logamos a informação
+    logger.info(f"Salvando dados do pagamento {order_id} ({method}, {amount}€)")
+    logger.info(f"Dados: {json.dumps(data, indent=2)}")
+    
+    # Em produção, salvar em banco de dados
+    # Exemplo: db.payments.insert_one(data)
+    
+    return True

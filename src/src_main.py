@@ -5,8 +5,8 @@ from flask import Flask
 from flask_cors import CORS
 from dotenv import load_dotenv
 
-# Importar blueprints
-from routes.feedback import feedback_bp
+# Importar blueprints - CORRIGIDO: fedback em vez de feedback
+from routes.fedback import feedback_bp
 from routes.payment import payment_bp
 
 # Configurar logging
@@ -44,6 +44,7 @@ def create_app():
     
     # Log de inicialização
     logger.info("Aplicação Flask inicializada com sucesso")
+    logger.info("FLASK_SECRET_KEY: %s", "DEFINIDA" if app.secret_key else "NÃO DEFINIDA")
     
     return app
 
