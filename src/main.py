@@ -28,9 +28,10 @@ except ImportError:
 
 # Import Blueprints
 # from src.models.user import db # Database not used yet
-#from src.routes.user import user_bp
-from src.routes.feedback import feedback_bp
-from src.routes.payment import payment_bp # Assegure-se que este import está correto e o ficheiro existe
+from src.routes.user import user_bp
+# CORRIGIDO: fedback em vez de feedback
+from src.routes.fedback import feedback_bp
+from src.routes.payment import payment_bp
 from src.routes.booking import booking_bp
 
 # Carregar variáveis de ambiente do ficheiro .env (para desenvolvimento local)
