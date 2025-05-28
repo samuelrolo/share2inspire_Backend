@@ -1,23 +1,25 @@
 runtime: python311
-entrypoint: gunicorn -b :$PORT --workers 1 --threads 8 --timeout 0 main:app
+entrypoint: gunicorn -b :$PORT main:app
 
-# Variáveis de ambiente não sensíveis
 env_variables:
-  FLASK_ENV: "production"
+  FLASK_APP: main.py
+  FLASK_ENV: production
   FLASK_DEBUG: "False"
-  BREVO_SENDER_EMAIL: "srshare2inspire@gmail.com"
-  BREVO_SENDER_NAME: "Share2Inspire"
-  IFTHENPAY_MULTIBANCO_ENTITY: "11111"
-  IFTHENPAY_MULTIBANCO_SUBENTITY: "999"
-  IFTHENPAY_CALLBACK_URL: "https://share2inspire-beckend.lm.r.appspot.com/api/payment/callback"
-
-# Para variáveis sensíveis, use o Secret Manager:
-# gcloud secrets create BREVO_API_KEY --data-file=/path/to/brevo_key.txt
-# gcloud secrets create IFTHENPAY_API_KEY --data-file=/path/to/ifthenpay_key.txt
-# etc.
 
 handlers:
-# Esta configuração serve todos os pedidos para a sua aplicação Flask.
+- url: /api/.*
+  script: auto
+  secure: always
+
 - url: /.*
   script: auto
-  secure: always # Força HTTPS
+  secure: always
+
+automatic_scaling:
+  min_instances: 1
+  max_instances: 5
+  min_idle_instances: 1
+  max_idle_instances: 1
+  min_pending_latency: 30ms
+  max_pending_latency: 100ms
+  max_concurrent_requests: 50
