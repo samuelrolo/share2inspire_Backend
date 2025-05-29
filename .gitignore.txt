@@ -1,0 +1,28 @@
+# Ambiente Virtual Python
+venv/
+.venv/
+env/
+ENV/
+
+# Ficheiros de cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ficheiros de ambiente (NUNCA FAÇA COMMIT DESTES!)
+.env
+.env.*
+!example.env
+
+# Ficheiros específicos da Google Cloud que podem conter segredos ou não são necessários no repo
+.gcloudignore
+
+# Outros (pode adicionar mais conforme necessário)
+.DS_Store
+*.log
+
+# .gitignore
+.env
+venv/
+__pycache__/
+*.pyc
