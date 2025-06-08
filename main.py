@@ -99,6 +99,14 @@ try:
 except ImportError as e:
     logger.error(f"Erro ao importar blueprint de payment: {str(e)}")
 
+try:
+    # Importar o blueprint de hr_downloads
+    from src.routes.hr_downloads import hr_downloads_bp
+    app.register_blueprint(hr_downloads_bp, url_prefix='/api')
+    logger.info("Blueprint de hr_downloads registado com sucesso")
+except ImportError as e:
+    logger.error(f"Erro ao importar blueprint de hr_downloads: {str(e)}")
+
 # Rota de teste/saúde
 @app.route('/')
 def health_check():
