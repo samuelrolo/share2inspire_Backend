@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard HR Downloads | Share2Inspire</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            border-left: 4px solid #667eea;
+            transition: transform 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .stat-label {
+            font-size: 1rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .chart-section {
+            padding: 30px;
+            background: #f8f9fa;
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+        
+        .downloads-list {
+            padding: 30px;
+        }
+        
+        .downloads-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+        
+        .downloads-table th {
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            text-align: left;
+        }
+        
+        .downloads-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .downloads-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .export-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin-bottom: 20px;
+            transition: background 0.3s ease;
+        }
+        
+        .export-btn:hover {
+            background: #218838;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Dashboard HR Downloads</h1>
+            <p>Estatísticas e análise de downloads do relatório HR Hub</p>
+        </div>
+        
+        <div id="loading" class="loading">
+            <h3>🔄 Carregando dados...</h3>
+        </div>
+        
+        <div id="error" class="error" style="display: none;">
+            <h3>❌ Erro ao carregar dados</h3>
+            <p id="error-message"></p>
+        </div>
+        
+        <div id="dashboard-content" style="display: none;">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="total-downloads">0</div>
+                    <div class="stat-label">Total Downloads</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="today-downloads">0</div>
+                    <div class="stat-label">Hoje</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="week-downloads">0</div>
+                    <div class="stat-label">Esta Semana</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="month-downloads">0</div>
+                    <div class="stat-label">Este Mês</div>
+                </div>
+            </div>
+            
+            <div class="chart-section">
+                <h3 style="margin-bottom: 20px; color: #333;">📈 Downloads por Dia</h3>
+                <div class="chart-container">
+                    <canvas id="downloadsChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+            
+            <div class="downloads-list">
+                <h3 style="margin-bottom: 20px; color: #333;">📋 Downloads Recentes</h3>
+                <button class="export-btn" onclick="exportCSV()">📤 Exportar CSV</button>
+                <table class="downloads-table">
+                    <thead>
+                        <tr>
+                            <th>Email</th>
+                            <th>IP</th>
+                            <th>Data/Hora</th>
+                            <th>User Agent</th>
+                        </tr>
+                    </thead>
+                    <tbody id="downloads-tbody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuração da API
+        const API_BASE = 'http://127.0.0.1:8080';
+        
+        // Carregar dados do dashboard
+        async function loadDashboard() {
+            try {
+                const response = await fetch(`${API_BASE}/api/hr-downloads`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                // Atualizar estatísticas
+                document.getElementById('total-downloads').textContent = data.total || 0;
+                document.getElementById('today-downloads').textContent = data.today || 0;
+                document.getElementById('week-downloads').textContent = data.thisWeek || 0;
+                document.getElementById('month-downloads').textContent = data.thisMonth || 0;
+                
+                // Criar gráfico
+                createChart(data.downloads || []);
+                
+                // Preencher tabela
+                fillTable(data.downloads || []);
+                
+                // Mostrar dashboard
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('dashboard-content').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Erro ao carregar dashboard:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error-message').textContent = error.message;
+            }
+        }
+        
+        // Criar gráfico de downloads
+        function createChart(downloads) {
+            const ctx = document.getElementById('downloadsChart').getContext('2d');
+            
+            // Agrupar downloads por dia
+            const downloadsByDay = {};
+            downloads.forEach(download => {
+                const date = new Date(download.timestamp).toLocaleDateString('pt-PT');
+                downloadsByDay[date] = (downloadsByDay[date] || 0) + 1;
+            });
+            
+            const labels = Object.keys(downloadsByDay).slice(-7); // Últimos 7 dias
+            const data = labels.map(label => downloadsByDay[label] || 0);
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Downloads',
+                        data: data,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Preencher tabela de downloads
+        function fillTable(downloads) {
+            const tbody = document.getElementById('downloads-tbody');
+            tbody.innerHTML = '';
+            
+            downloads.slice(-10).reverse().forEach(download => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${download.email || 'N/A'}</td>
+                    <td>${download.ip || 'N/A'}</td>
+                    <td>${new Date(download.timestamp).toLocaleString('pt-PT')}</td>
+                    <td>${(download.user_agent || 'N/A').substring(0, 50)}...</td>
+                `;
+            });
+        }
+        
+        // Exportar dados para CSV
+        async function exportCSV() {
+            try {
+                const response = await fetch(`${API_BASE}/api/hr-downloads/export`);
+                const blob = await response.blob();
+                
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `hr-downloads-${new Date().toISOString().split('T')[0]}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+            } catch (error) {
+                alert('Erro ao exportar CSV: ' + error.message);
+            }
+        }
+        
+        // Carregar dashboard quando a página carrega
+        document.addEventListener('DOMContentLoaded', loadDashboard);
+        
+        // Recarregar dados a cada 30 segundos
+        setInterval(loadDashboard, 30000);
+    </script>
+</body>
+</html>
