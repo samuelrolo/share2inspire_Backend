@@ -92,12 +92,19 @@ except ImportError as e:
     logger.error(f"Erro ao importar blueprint de feedback: {str(e)}")
 
 try:
-    # Importar o blueprint de payment
-    from src.routes.payment import payment_bp
+    # Importar o blueprint de payment CORRIGIDO
+    from src.routes.payment_fixed import payment_bp
     app.register_blueprint(payment_bp, url_prefix='/api/payment')
-    logger.info("Blueprint de payment registado com sucesso")
+    logger.info("Blueprint de payment CORRIGIDO registado com sucesso")
 except ImportError as e:
-    logger.error(f"Erro ao importar blueprint de payment: {str(e)}")
+    logger.error(f"Erro ao importar blueprint de payment corrigido: {str(e)}")
+    # Fallback para versão antiga
+    try:
+        from src.routes.payment import payment_bp as payment_bp_old
+        app.register_blueprint(payment_bp_old, url_prefix='/api/payment')
+        logger.info("Blueprint de payment ANTIGO registado como fallback")
+    except ImportError as e2:
+        logger.error(f"Erro ao importar blueprint de payment antigo: {str(e2)}")
 
 try:
     # Importar o blueprint de hr_downloads
