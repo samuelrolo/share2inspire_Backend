@@ -15,6 +15,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from flask import Flask, send_from_directory
+from flask_cors import CORS
 from dotenv import load_dotenv
 
 # Tentar importar a biblioteca do Secret Manager
@@ -63,6 +64,14 @@ def create_app():
     """
     # Criação da Aplicação Flask
     app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
+    
+    # Configurar CORS para permitir requests do frontend
+    CORS(app, origins=[
+        "https://share2inspire.pt",
+        "https://www.share2inspire.pt", 
+        "http://localhost:3000",
+        "http://127.0.0.1:3000"
+    ])
     
     # Carregar segredos da Google Cloud Secret Manager
     project_id = os.getenv("GOOGLE_CLOUD_PROJECT") # App Engine define esta variável automaticamente
