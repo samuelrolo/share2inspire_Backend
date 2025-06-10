@@ -33,6 +33,7 @@ from src.routes.user import user_bp
 from src.routes.fedback import feedback_bp
 from src.routes.payment import payment_bp
 from src.routes.booking import booking_bp
+from src.routes.hr_downloads import hr_downloads_bp
 
 # Carregar variáveis de ambiente do ficheiro .env (para desenvolvimento local)
 load_dotenv()
@@ -125,6 +126,7 @@ def create_app():
     app.register_blueprint(feedback_bp)
     app.register_blueprint(payment_bp)
     app.register_blueprint(booking_bp)
+    app.register_blueprint(hr_downloads_bp)
 
     # Rota para servir ficheiros estáticos (ex: frontend se integrado) ou index.html
     @app.route('/', defaults={'path': ''})
