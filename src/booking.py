@@ -56,10 +56,10 @@ def schedule_appointment():
             print(f"Erro: Dados incompletos para agendamento. Campos em falta: {', '.join(missing)}")
             return jsonify({"error": f"Dados incompletos para agendamento. Campos em falta: {', '.join(missing)}"}), 400
 
-        # Construir o email
+        # Construir o email - E-MAIL CORRIGIDO
         print("Construindo email para envio via Brevo...")
         send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-            to=[{"email": "srshare2inspire@gmail.com", "name": "Share2Inspire Admin"}],
+            to=[{"email": "share2inspire@gmail.com", "name": "Share2Inspire Admin"}],
             sender={"email": os.getenv("BREVO_SENDER_EMAIL", "noreply@share2inspire.pt"), "name": "Sistema de Agendamento"},
             subject=f"Novo Agendamento - {service_type}",
             html_content=f"""
@@ -135,10 +135,10 @@ def request_consultation():
             print(f"Erro: Dados incompletos para pedido de consultoria. Campos em falta: {', '.join(missing)}")
             return jsonify({"error": f"Dados incompletos para pedido de consultoria. Campos em falta: {', '.join(missing)}"}), 400
 
-        # Construir o email
+        # Construir o email - E-MAIL CORRIGIDO
         print("Construindo email para envio via Brevo...")
         send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-            to=[{"email": "srshare2inspire@gmail.com", "name": "Share2Inspire Admin"}],
+            to=[{"email": "share2inspire@gmail.com", "name": "Share2Inspire Admin"}],
             sender={"email": os.getenv("BREVO_SENDER_EMAIL", "noreply@share2inspire.pt"), "name": "Sistema de Consultoria"},
             subject=f"Novo Pedido de Consultoria - {topic}",
             html_content=f"""
@@ -213,10 +213,10 @@ def request_content():
             print(f"Erro: Dados incompletos para pedido de criação de conteúdo. Campos em falta: {', '.join(missing)}")
             return jsonify({"error": f"Dados incompletos para pedido de criação de conteúdo. Campos em falta: {', '.join(missing)}"}), 400
 
-        # Construir o email
+        # Construir o email - E-MAIL CORRIGIDO
         print("Construindo email para envio via Brevo...")
         send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-            to=[{"email": "srshare2inspire@gmail.com", "name": "Share2Inspire Admin"}],
+            to=[{"email": "share2inspire@gmail.com", "name": "Share2Inspire Admin"}],
             sender={"email": os.getenv("BREVO_SENDER_EMAIL", "noreply@share2inspire.pt"), "name": "Sistema de Criação de Conteúdos"},
             subject=f"Novo Pedido de Criação de Conteúdo - {content_type}",
             html_content=f"""
@@ -259,3 +259,4 @@ def request_content():
     except Exception as e:
         print(f"Erro global no endpoint /content: {e}")
         return jsonify({"error": "Ocorreu um erro no servidor.", "details": str(e)}), 500
+

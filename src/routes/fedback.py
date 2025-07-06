@@ -28,12 +28,12 @@ if not api_key:
 else:
     logger.info("Chave API Brevo configurada com sucesso")
 
-# Email do remetente verificado na Brevo
-VERIFIED_SENDER_EMAIL = os.getenv("BREVO_SENDER_EMAIL", "srshare2inspire@gmail.com")
+# Email do remetente verificado na Brevo - E-MAIL CORRIGIDO
+VERIFIED_SENDER_EMAIL = os.getenv("BREVO_SENDER_EMAIL", "share2inspire@gmail.com")
 VERIFIED_SENDER_NAME = os.getenv("BREVO_SENDER_NAME", "Share2Inspire")
 
-# Email do destinatário (admin)
-ADMIN_EMAIL = "srshare2inspire@gmail.com"
+# Email do destinatário (admin) - E-MAIL CORRIGIDO
+ADMIN_EMAIL = "share2inspire@gmail.com"
 ADMIN_NAME = "Share2Inspire Admin"
 
 api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
@@ -430,3 +430,4 @@ def submit_newsletter():
             "error": "Ocorreu um erro inesperado ao processar a sua subscrição. Por favor, tente novamente mais tarde.",
             "status": "error"
         }), 500
+

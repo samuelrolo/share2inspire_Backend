@@ -1,165 +1,214 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Este ficheiro é uma versão modificada do src/main.py fornecido pelo utilizador,
-integrando o carregamento de segredos (chaves API) a partir do Google Cloud Secret Manager
-com fallback para variáveis de ambiente definidas no app.yaml.
+Aplicação principal do backend Share2Inspire
+Versão CORRIGIDA com blueprints de email_service e ifthenpay - URL PREFIX CORRIGIDO
+"""
 
-Modificações:
-1. Adicionada função create_app() para compatibilidade com App Engine
-2. Melhorado o fallback para variáveis de ambiente quando o Secret Manager não está acessível
-3. Reduzidos os avisos críticos quando as variáveis estão definidas no ambiente
-"""
 import os
-import sys
-
-# DON'T CHANGE THIS !!!
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
-from flask import Flask, send_from_directory
+import logging
+from flask import Flask, Blueprint, jsonify, request, send_from_directory
+from flask_cors import CORS 
 from dotenv import load_dotenv
 
-# Tentar importar a biblioteca do Secret Manager
-try:
-    from google.cloud import secretmanager
-    SECRET_MANAGER_AVAILABLE = True
-except ImportError:
-    SECRET_MANAGER_AVAILABLE = False
-    print("AVISO: Biblioteca google-cloud-secret-manager não encontrada. Não será possível carregar segredos da GCP.")
-    print("Execute 'pip install google-cloud-secret-manager' e adicione ao requirements.txt")
+# Configurar logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-# Import Blueprints
-# from src.models.user import db # Database not used yet
-from src.routes.user import user_bp
-# CORRIGIDO: fedback em vez de feedback
-from src.routes.fedback import feedback_bp
-from src.routes.payment import payment_bp
-from src.routes.booking import booking_bp
-
-# Carregar variáveis de ambiente do ficheiro .env (para desenvolvimento local)
+# Carregar variáveis de ambiente
 load_dotenv()
 
-# Função para aceder a segredos do Google Cloud Secret Manager
-def get_secret(project_id, secret_id, version_id="latest"):
-    if not SECRET_MANAGER_AVAILABLE:
-        print(f"AVISO: Tentativa de aceder ao segredo {secret_id} mas Secret Manager não está disponível.")
-        return None
-    
-    client = secretmanager.SecretManagerServiceClient()
-    name = f"projects/{project_id}/secrets/{secret_id}/versions/{version_id}"
+# Criar aplicação Flask
+app = Flask(__name__)
+
+# Configuração CORS corrigida
+CORS(app, resources={
+    r"/api/*": {
+        "origins": [
+            "https://share2inspire.pt",
+            "http://share2inspire.pt",
+            "https://www.share2inspire.pt",
+            "http://www.share2inspire.pt",
+            "http://localhost:3000",
+            "http://localhost:5000",
+            "http://localhost:5500",
+            "http://localhost:8080",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:5000",
+            "http://127.0.0.1:5500",
+            "http://127.0.0.1:8080"
+        ],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+        "supports_credentials": True
+    }
+})
+
+# Configurar chave secreta
+app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24).hex())
+
+# Middleware global para garantir cabeçalhos CORS em todas as respostas
+@app.after_request
+def add_cors_headers(response):
+    if 'Access-Control-Allow-Origin' not in response.headers:
+        response.headers.add('Access-Control-Allow-Origin', '*')
+    if 'Access-Control-Allow-Headers' not in response.headers:
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With')
+    if 'Access-Control-Allow-Methods' not in response.headers:
+        response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
+    if 'Access-Control-Allow-Credentials' not in response.headers:
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
+
+# Função para tratar preflight requests
+def handle_cors_preflight():
+    response = jsonify({"success": True})
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response, 200
+
+@app.route('/', defaults={'path': ''}, methods=['OPTIONS'])
+@app.route('/<path:path>', methods=['OPTIONS'])
+def options_handler(path):
+    return handle_cors_preflight()
+
+# Importar e registar blueprints existentes
+try:
+    # CORRIGIDO: Caminho de importação e nome do módulo
+    from src.routes.feedback import feedback_bp
+    app.register_blueprint(feedback_bp, url_prefix='/api/feedback')
+    logger.info("Blueprint de feedback registado com sucesso")
+except ImportError as e:
+    logger.error(f"Erro ao importar blueprint de feedback: {str(e)}")
+
+try:
+    # CORRIGIDO: Caminho de importação
+    from src.routes.payment import payment_bp
+    app.register_blueprint(payment_bp, url_prefix='/api/payment')
+    logger.info("Blueprint de payment registado com sucesso")
+except ImportError as e:
+    logger.error(f"Erro ao importar blueprint de payment: {str(e)}")
+
+try:
+    # CORRIGIDO: Caminho de importação
+    from src.routes.ifthenpay import ifthenpay_bp
+    app.register_blueprint(ifthenpay_bp, url_prefix='/api/ifthenpay')
+    logger.info("Blueprint de IFTHENPAY registado com sucesso em /api/ifthenpay")
+except ImportError as e:
+    logger.error(f"Erro ao importar blueprint de ifthenpay: {str(e)}")
+    logger.error("ATENÇÃO: Serviços de pagamento Ifthenpay não estarão disponíveis!")
+
+# CORRIGIDO: Import da blueprint de email_service
+try:
+    # CORRIGIDO: Caminho de importação
+    from src.routes.email import email_bp
+    app.register_blueprint(email_bp, url_prefix='/api/email')
+    logger.info("Blueprint de EMAIL registado com sucesso em /api/email")
+except ImportError as e:
+    logger.error(f"Erro ao importar blueprint de email: {str(e)}")
+    logger.error("ATENÇÃO: Serviços de email não estarão disponíveis!")
+
+# Rota de teste/saúde
+@app.route('/')
+def health_check():
+    return {
+        "status": "online",
+        "message": "API Share2Inspire em funcionamento",
+        "version": "2.1.0",
+        "services": {
+            "email": "disponível em /api/email/*",
+            "ifthenpay": "disponível em /api/ifthenpay/*",
+            "payment": "disponível em /api/payment/*",
+            "feedback": "disponível em /api/feedback/*"
+        },
+        "cors": "enabled for all origins"
+    }
+
+# Rota para debug de requisições
+@app.route('/debug', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+def debug_request():
+    if request.method == 'OPTIONS':
+        return handle_cors_preflight()
+    result = {
+        "method": request.method,
+        "headers": dict(request.headers),
+        "url": request.url,
+        "path": request.path,
+        "args": dict(request.args),
+        "form": dict(request.form),
+        "json": request.get_json(silent=True),
+        "data": request.data.decode('utf-8') if request.data else None
+    }
+    return jsonify(result), 200
+
+@app.route('/status')
+def service_status():
     try:
-        response = client.access_secret_version(request={"name": name})
-        secret_value = response.payload.data.decode("UTF-8")
-        print(f"Segredo {secret_id} carregado com sucesso do Secret Manager.")
-        return secret_value
+        from datetime import datetime
+        status = {
+            "timestamp": str(datetime.now()),
+            "services": {}
+        }
+        # CORRIGIDO: Caminhos de importação para o status check
+        try:
+            from src.routes.email import email_bp
+            status["services"]["email"] = "online"
+        except ImportError:
+            status["services"]["email"] = "offline"
+        try:
+            from src.routes.ifthenpay import ifthenpay_bp
+            status["services"]["ifthenpay"] = "online"
+        except ImportError:
+            status["services"]["ifthenpay"] = "offline"
+        env_status = {}
+        critical_vars = [
+            "BREVO_API_KEY",
+            "IFTHENPAY_MBWAY_KEY",
+            "IFTHENPAY_MULTIBANCO_KEY",
+            "IFTHENPAY_PAYSHOP_KEY",
+            "FLASK_SECRET_KEY"
+        ]
+        for var in critical_vars:
+            env_status[var] = "DEFINIDA" if os.getenv(var) else "NÃO DEFINIDA"
+        status["environment"] = env_status
+        return jsonify(status), 200
     except Exception as e:
-        print(f"ERRO ao aceder ao segredo {secret_id} no projeto {project_id}: {e}")
-        print(f"Verifique se o segredo existe com o ID '{secret_id}', se a API Secret Manager está ativa e se a conta de serviço tem permissões.")
-        return None
+        logger.error(f"Erro no status check: {str(e)}")
+        return jsonify({
+            "error": "Erro ao verificar status dos serviços",
+            "details": str(e)
+        }), 500
 
-def create_app():
-    """
-    Função factory para criar e configurar a aplicação Flask.
-    Esta função é necessária para o App Engine encontrar e inicializar a aplicação.
-    """
-    # Criação da Aplicação Flask
-    app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
-    
-    # Carregar segredos da Google Cloud Secret Manager
-    project_id = os.getenv("GOOGLE_CLOUD_PROJECT") # App Engine define esta variável automaticamente
-
-    # Nomes dos segredos como devem estar no Secret Manager (IDs dos segredos)
-    # e como serão acedidos no código (chaves do dicionário os.environ)
-    SECRETS_TO_LOAD_FROM_GCP = [
-        "BREVO_API_KEY",
-        "IFTHENPAY_GATEWAY_KEY",
-        "IFTHENPAY_CALLBACK_KEY",
-        "IFTHENPAY_MBWAY_KEY",
-        "IFTHENPAY_PAYSHOP_KEY",
-        "IFTHENPAY_MB_KEY",
-        "FLASK_SECRET_KEY",
-        "ANTI_PHISHING_KEY"
-        # Adicione outras chaves de API ou credenciais aqui, como DB_PASSWORD, etc.
-    ]
-
-    # Tentar carregar segredos do Secret Manager, mas não falhar se não conseguir
-    # (usará as variáveis de ambiente definidas no app.yaml como fallback)
-    if project_id and SECRET_MANAGER_AVAILABLE:
-        print(f"A carregar segredos para o projeto GCP: {project_id}")
-        for secret_name in SECRETS_TO_LOAD_FROM_GCP:
-            # Só tenta carregar do Secret Manager se a variável não estiver já definida no ambiente
-            if not os.getenv(secret_name):
-                secret_value = get_secret(project_id, secret_name)
-                if secret_value:
-                    os.environ[secret_name] = secret_value
-                    print(f"Segredo {secret_name} carregado do Secret Manager.")
-                else:
-                    # Verificar se a variável está definida no ambiente (app.yaml)
-                    if os.getenv(secret_name):
-                        print(f"Usando {secret_name} definida no ambiente (app.yaml).")
-                    else:
-                        print(f"AVISO: {secret_name} não está disponível no Secret Manager nem no ambiente.")
-            else:
-                print(f"Usando {secret_name} já definida no ambiente (app.yaml).")
-    elif not project_id and SECRET_MANAGER_AVAILABLE:
-        print("AVISO: GOOGLE_CLOUD_PROJECT não definido. Não foi possível carregar segredos do Secret Manager.")
-        print("Usando variáveis de ambiente definidas no app.yaml ou .env.")
-    else:
-        print("Secret Manager não disponível. Usando variáveis de ambiente definidas no app.yaml ou .env.")
-
-    # Verificar variáveis críticas
-    for var_name in SECRETS_TO_LOAD_FROM_GCP:
-        if not os.getenv(var_name):
-            if var_name == "FLASK_SECRET_KEY":
-                print(f"ALERTA DE SEGURANÇA: {var_name} não está definida! Usando valor temporário (INSEGURO PARA PRODUÇÃO).")
-                os.environ[var_name] = "temp_secret_key_insecure_for_production_only"
-            else:
-                print(f"AVISO: {var_name} não está definida. Algumas funcionalidades podem não funcionar corretamente.")
-
-    # Configurar FLASK_SECRET_KEY
-    app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY')
-    if not app.config['SECRET_KEY']:
-        print("ALERTA DE SEGURANÇA: FLASK_SECRET_KEY não está definida! Usando valor temporário (INSEGURO PARA PRODUÇÃO).")
-        app.config['SECRET_KEY'] = 'temp_secret_key_insecure_for_production_only'
-
-    # Registar os blueprints
-    app.register_blueprint(user_bp, url_prefix='/api')
-    app.register_blueprint(feedback_bp)
-    app.register_blueprint(payment_bp)
-    app.register_blueprint(booking_bp)
-
-    # Rota para servir ficheiros estáticos (ex: frontend se integrado) ou index.html
-    @app.route('/', defaults={'path': ''})
-    @app.route('/<path:path>')
-    def serve(path):
-        static_folder_path = app.static_folder
-        if static_folder_path is None:
-                return "Pasta estática não configurada", 404
-
-        if path != "" and os.path.exists(os.path.join(static_folder_path, path)):
-            # Serve ficheiro específico se existir
-            return send_from_directory(static_folder_path, path)
+# Imprimir variáveis de ambiente disponíveis
+logger.info("=== VARIÁVEIS DE AMBIENTE DISPONÍVEIS ===")
+env_vars_to_check = [
+    "BREVO_API_KEY",
+    "BREVO_SENDER_EMAIL",
+    "BREVO_SENDER_NAME",
+    "IFTHENPAY_MBWAY_KEY",
+    "IFTHENPAY_MULTIBANCO_KEY",
+    "IFTHENPAY_PAYSHOP_KEY",
+    "IFTHENPAY_CALLBACK_SECRET",
+    "FLASK_SECRET_KEY"
+]
+for key in env_vars_to_check:
+    value = os.getenv(key)
+    if value:
+        if len(value) > 10:
+            masked_value = value[:4] + "..." + value[-4:]
         else:
-            # Serve index.html por defeito para rotas não encontradas (útil para SPAs)
-            index_path = os.path.join(static_folder_path, 'index.html')
-            if os.path.exists(index_path):
-                return send_from_directory(static_folder_path, 'index.html')
-            else:
-                return "index.html não encontrado na pasta estática.", 404
+            masked_value = "***"
+        logger.info(f"{key}: DEFINIDA ({masked_value})")
+    else:
+        logger.info(f"{key}: NÃO DEFINIDA")
 
-    return app
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8080))
+    debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"
+    logger.info(f"Iniciando servidor na porta {port}")
+    logger.info(f"Modo debug: {debug_mode}")
+    logger.info("URL PREFIX CORRIGIDO: /api/ifthenpay")
+    app.run(host="0.0.0.0", port=port, debug=debug_mode)
 
-# Criar a aplicação usando a função factory
-app = create_app()
-
-if __name__ == '__main__':
-    host = os.getenv('FLASK_RUN_HOST', '0.0.0.0')
-    port = int(os.getenv('FLASK_RUN_PORT', 8080)) # Porta 8080 é comum para App Engine
-    
-    # FLASK_DEBUG deve ser False em produção. Carregar do .env ou definir para False.
-    # A variável de ambiente FLASK_ENV=(development|production) também é comum.
-    debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() in ['true', '1', 't'] 
-    if os.getenv("GOOGLE_CLOUD_PROJECT"):
-        debug_mode = False # Forçar debug False em ambiente GCP (App Engine, Cloud Run, etc.)
-        print("Ambiente GCP detetado. FLASK_DEBUG definido como False.")
-    
-    print(f"A iniciar servidor Flask em {host}:{port} (Debug: {debug_mode})")
-    app.run(host=host, port=port, debug=debug_mode)
