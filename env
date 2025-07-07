@@ -3,8 +3,8 @@
 # Adicione .env ao .gitignore
 
 # Chaves API Brevo (Sendinblue) - E-MAIL CORRIGIDO
-BREVO_API_KEY="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"
-BREVO_SENDER_EMAIL=share2inspire@gmail.com
+BREVO_API_KEY="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"
+BREVO_SENDER_EMAIL=srshare2inspire@gmail.com
 BREVO_SENDER_NAME=Share2Inspire
 
 # Chaves API IfthenPay - CORRIGIDO: Nome consistente com o código
