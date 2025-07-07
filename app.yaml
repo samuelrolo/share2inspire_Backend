@@ -1,9 +1,9 @@
 runtime: python311
 
-# Entrypoint corrigido para a nova estrutura (main.py na raiz)
+# Entrypoint corrigido
 entrypoint: gunicorn -b :$PORT main:app
 
-# Variáveis de ambiente com as chaves reais
+# Variáveis de ambiente
 env_variables:
   FLASK_APP: main.py
   FLASK_ENV: production
@@ -23,55 +23,22 @@ env_variables:
   
   # Chave secreta Flask
   FLASK_SECRET_KEY: "6BgB0lORveVCA/bsnK3XddCBnxvN3+Q8Z8We7cBeWAQ="
-  
-  # URLs importantes
-  BACKEND_URL: "https://share2inspire-beckend.lm.r.appspot.com"
-  GOOGLE_APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbzQei8eWoo2NLzyk9rpK5JuCSStlenW2dSHRCdWm5Ba2OpNt2wUyknZ1nERXP0kmR5k/exec"
-  
-  # Anti-Phishing Key
-  ANTI_PHISHING_KEY: "SUbOv6HYq8WVAmSEqkLKZvjAhBPsr1LI9ifRXTtrvMs="
 
-# Handlers otimizados
+# Handlers simplificados
 handlers:
-# Handler para ficheiros estáticos (CSS, JS, imagens)
-- url: /static
-  static_dir: static
-  secure: always
-  expiration: "1d"
-
-# Handler para APIs
-- url: /api/.*
-  script: auto
-  secure: always
-
-# Handler para debug e status
-- url: /(debug|status)
-  script: auto
-  secure: always
-
-# Handler catch-all para outras rotas
 - url: /.*
   script: auto
   secure: always
 
-# Configurações de escalabilidade otimizadas
+# Configurações de escalabilidade
 automatic_scaling:
-  min_instances: 0  # Permite escalar para zero quando não há tráfego
-  max_instances: 10  # Aumentado para lidar com picos de tráfego
-  min_idle_instances: 0  # Reduz custos quando não há tráfego
-  max_idle_instances: 2  # Mantém algumas instâncias prontas
-  min_pending_latency: 50ms  # Otimizado para responsividade
-  max_pending_latency: 200ms  # Permite mais latência antes de escalar
-  max_concurrent_requests: 80  # Aumentado para melhor throughput
+  min_instances: 1
+  max_instances: 5
+  target_cpu_utilization: 0.6
 
 # Configurações de recursos
 resources:
   cpu: 1
-  memory_gb: 1  # Aumentado para melhor performance
+  memory_gb: 0.5
   disk_size_gb: 10
-
-# Configurações de rede
-network:
-  forwarded_ports:
-  - 8080
 
