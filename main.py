@@ -8,9 +8,15 @@ Apenas com funcionalidades essenciais para Kickstart Pro
 import os
 import logging
 import requests
+import json
 from flask import Flask, jsonify, request
 from flask_cors import CORS 
 from dotenv import load_dotenv
+from google.cloud import secretmanager
+import google.generativeai as genai
+from werkzeug.utils import secure_filename
+import PyPDF2
+import io
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -18,6 +24,27 @@ logger = logging.getLogger(__name__)
 
 # Carregar variáveis de ambiente
 load_dotenv()
+
+# Função para obter segredos do Google Secret Manager
+def get_secret(secret_id):
+    """Obter segredo do Google Secret Manager"""
+    try:
+        project_id = os.getenv('GCP_PROJECT_ID', 'share2inspire-beckend')
+        client = secretmanager.SecretManagerServiceClient()
+        name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
+        response = client.access_secret_version(request={"name": name})
+        return response.payload.data.decode('UTF-8')
+    except Exception as e:
+        logger.warning(f"Não foi possível obter segredo {secret_id} do Secret Manager: {str(e)}")
+        # Fallback para variável de ambiente
+        return os.getenv(secret_id)
+
+# Configurar Gemini API
+GEMINI_API_KEY = get_secret('Gemini') or os.getenv('GEMINI_API_KEY')
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+else:
+    logger.warning("GEMINI_API_KEY não configurada")
 
 # Criar aplicação Flask
 app = Flask(__name__)
@@ -330,6 +357,161 @@ def process_payshop_payment():
         logger.error(f"Erro no endpoint Payshop: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+# === FUNCIONALIDADES CANDIDATE FIT ===
+
+def extract_text_from_pdf(pdf_file):
+    """Extrair texto de um ficheiro PDF"""
+    try:
+        pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_file.read()))
+        text = ""
+        for page in pdf_reader.pages:
+            text += page.extract_text()
+        return text
+    except Exception as e:
+        logger.error(f"Erro ao extrair texto do PDF: {str(e)}")
+        return None
+
+def analyze_cv_with_gemini(cv_text, job_description, seniority, country, sector):
+    """Analisar CV com Gemini e gerar relatório"""
+    try:
+        if not GEMINI_API_KEY:
+            return {"success": False, "error": "Gemini API não configurada"}
+        
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        
+        prompt = f"""
+Você é um avaliador de candidaturas para carreiras corporativas, consultoria e áreas de transformação. 
+Produz um diagnóstico claro, curto e acionável.
+
+Contexto:
+- Senioridade alvo: {seniority}
+- País e mercado alvo: {country}
+- Setor alvo: {sector}
+
+Descrição da vaga:
+{job_description}
+
+Texto integral do CV:
+{cv_text}
+
+Gere um relatório Candidate Fit em formato JSON com a seguinte estrutura:
+{{
+  "score_global": <número 0-100>,
+  "fit_band": "<Elevado|Moderado|Parcial>",
+  "dimensões": {{
+    "skills_técnicas": <número 0-100>,
+    "experiência": <número 0-100>,
+    "soft_skills": <número 0-100>,
+    "fit_cultural": <número 0-100>,
+    "educação": <número 0-100>
+  }},
+  "dim_state": {{
+    "skills_técnicas": "<ok|warn|risk>",
+    "experiência": "<ok|warn|risk>",
+    "soft_skills": "<ok|warn|risk>",
+    "fit_cultural": "<ok|warn|risk>",
+    "educação": "<ok|warn|risk>"
+  }},
+  "dim_label": {{
+    "skills_técnicas": "<Sólido|A reforçar|Crítico>",
+    "experiência": "<Sólido|A reforçar|Crítico>",
+    "soft_skills": "<Sólido|A reforçar|Crítico>",
+    "fit_cultural": "<Sólido|A reforçar|Crítico>",
+    "educação": "<Sólido|A reforçar|Crítico>"
+  }},
+  "pontos_fortes": ["...", "...", "..."],
+  "lacunas": ["...", "...", "..."],
+  "próximos_passos": ["...", "...", "..."],
+  "resumo": "<3 linhas em linguagem executiva>"
+}}
+
+Dimensões e pesos:
+- skills_técnicas: 40%
+- experiência: 30%
+- soft_skills: 15%
+- fit_cultural: 10%
+- educação: 5%
+
+Regras:
+- Avalia cada dimensão de 0 a 100
+- Calcula score_global com os pesos acima
+- Escreve pontos_fortes e lacunas de forma específica e não genérica
+- Recomenda próximos_passos práticos para 30 dias
+- Inclui um resumo em 3 linhas, linguagem executiva
+
+Retorna APENAS o JSON, sem explicações adicionais.
+"""
+        
+        response = model.generate_content(prompt)
+        
+        # Tentar extrair JSON da resposta
+        response_text = response.text
+        
+        # Se a resposta contém markdown code blocks, remover
+        if '```json' in response_text:
+            response_text = response_text.split('```json')[1].split('```')[0]
+        elif '```' in response_text:
+            response_text = response_text.split('```')[1].split('```')[0]
+        
+        report = json.loads(response_text.strip())
+        return {"success": True, "report": report}
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"Erro ao fazer parse do JSON da resposta Gemini: {str(e)}")
+        return {"success": False, "error": "Erro ao processar resposta da análise"}
+    except Exception as e:
+        logger.error(f"Erro ao analisar CV com Gemini: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+@app.route('/api/analyze_cv', methods=['POST'])
+def analyze_cv():
+    """Analisar CV e gerar relatório Candidate Fit"""
+    try:
+        # Verificar se é FormData ou JSON
+        if 'file' in request.files:
+            # Upload de ficheiro
+            file = request.files['file']
+            job_description = request.form.get('job_text', '')
+            seniority = request.form.get('seniority', 'Mid')
+            country = request.form.get('country', 'Portugal')
+            sector = request.form.get('sector', 'Consultoria e Transformação')
+            
+            if file.filename == '':
+                return jsonify({"success": False, "error": "Nenhum ficheiro selecionado"}), 400
+            
+            # Extrair texto do ficheiro
+            if file.filename.endswith('.pdf'):
+                cv_text = extract_text_from_pdf(file)
+            else:
+                cv_text = file.read().decode('utf-8')
+            
+            if not cv_text:
+                return jsonify({"success": False, "error": "Não foi possível extrair texto do ficheiro"}), 400
+        else:
+            # JSON payload
+            data = request.get_json()
+            cv_text = data.get('cv_text', '')
+            job_description = data.get('job_text', '')
+            seniority = data.get('seniority', 'Mid')
+            country = data.get('country', 'Portugal')
+            sector = data.get('sector', 'Consultoria e Transformação')
+            
+            if not cv_text or not job_description:
+                return jsonify({"success": False, "error": "CV e descrição da vaga são obrigatórios"}), 400
+        
+        # Analisar CV
+        result = analyze_cv_with_gemini(cv_text, job_description, seniority, country, sector)
+        
+        if result['success']:
+            logger.info(f"CV analisado com sucesso para senioridade: {seniority}")
+            return jsonify(result)
+        else:
+            return jsonify(result), 500
+            
+    except Exception as e:
+        logger.error(f"Erro no endpoint de análise de CV: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
 # === VERIFICAÇÃO DE SAÚDE ===
 
 @app.route('/health')
@@ -342,7 +524,8 @@ def health_check():
             "brevo": bool(os.getenv('BREVO_API_KEY')),
             "ifthenpay_multibanco": bool(os.getenv('IFTHENPAY_MULTIBANCO_KEY')),
             "ifthenpay_mbway": bool(os.getenv('IFTHENPAY_MBWAY_KEY')),
-            "ifthenpay_payshop": bool(os.getenv('IFTHENPAY_PAYSHOP_KEY'))
+            "ifthenpay_payshop": bool(os.getenv('IFTHENPAY_PAYSHOP_KEY')),
+            "gemini": bool(GEMINI_API_KEY)
         }
     })
 
