@@ -14,7 +14,7 @@ from flask import Flask, request, jsonify
 >>>>>>> Stashed changes
 from flask_cors import CORS
 
-# Configurar logging
+# Configuração de logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -25,11 +25,32 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# === CONFIGURAÇÕES ===
-app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'default-secret-key')
+# === ROTAS DE SAÚDE ===
+
+<<<<<<< Updated upstream
+# === ROTAS DE EMAIL (CORRIGIDAS) ===
+
+=======
+@app.route('/')
+def health_check():
+    return jsonify({
+        "message": "Share2Inspire Backend - Email Corrigido",
+        "status": "online",
+        "timestamp": datetime.now().isoformat()
+    })
+
+@app.route('/api/health')
+def api_health():
+    return jsonify({
+        "service": "share2inspire-backend",
+        "status": "healthy",
+        "version": "email-fixed",
+        "timestamp": datetime.now().isoformat()
+    })
 
 # === ROTAS DE EMAIL (CORRIGIDAS) ===
 
+>>>>>>> Stashed changes
 @app.route('/api/email/kickstart', methods=['POST'])
 def send_kickstart_email():
     try:
@@ -119,28 +140,55 @@ def send_brevo_email_simple(to_email, to_name, form_data):
 
 # === ROTAS IFTHENPAY (CORRIGIDAS) ===
 
-@app.route('/')
-def health():
-    """Endpoint de saúde"""
-    return jsonify({
-        "status": "online",
-        "message": "Share2Inspire Backend - Versão Corrigida"
-    })
+@app.route('/api/ifthenpay/multibanco', methods=['POST'])
+def create_multibanco_reference():
+    try:
+        data = request.get_json()
+<<<<<<< Updated upstream
+        logger.info(f"Dados recebidos para MB WAY: {data}")
+        
+        required_fields = ['amount', 'orderId', 'mobileNumber']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({"success": False, "error": f"Campo {field} obrigatório"}), 400
+        
+        result = create_mbway_payment(
+            amount=float(data['amount']),
+            phone=data['mobileNumber'],
+            order_id=data['orderId']
+        )
+        
+        logger.info(f"Resultado MB WAY: {result}")
+=======
+        logger.info(f"Dados recebidos para Multibanco: {data}")
+        
+        if not data.get('amount') or not data.get('orderId'):
+            return jsonify({"success": False, "error": "Amount e orderId obrigatórios"}), 400
+        
+        result = create_multibanco_payment(
+            amount=float(data['amount']),
+            order_id=data['orderId']
+        )
+        
+        logger.info(f"Resultado Multibanco: {result}")
+>>>>>>> Stashed changes
+        
+        if result['success']:
+            return jsonify(result)
+        else:
+<<<<<<< Updated upstream
+            return jsonify(result), 400
+            
+    except Exception as e:
+=======
+            return jsonify(result), 500
+            
+    except Exception as e:
+        logger.error(f"Erro no endpoint Multibanco: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/health')
-def health_check():
-    """Health check detalhado"""
-    return jsonify({
-        "status": "healthy",
-        "service": "Share2Inspire Backend",
-        "version": "1.0.0"
-    })
-
-# === ROTAS DE EMAIL ===
-
-@app.route('/api/email/kickstart', methods=['POST'])
-def send_kickstart_email():
-    """Enviar email de confirmação do Kickstart Pro"""
+@app.route('/api/ifthenpay/mbway', methods=['POST'])
+def create_mbway_payment_endpoint():
     try:
         data = request.get_json()
         logger.info(f"Dados recebidos para MB WAY: {data}")
@@ -164,6 +212,7 @@ def send_kickstart_email():
             return jsonify(result), 400
             
     except Exception as e:
+>>>>>>> Stashed changes
         logger.error(f"Erro no endpoint MB WAY: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 400
 
@@ -326,6 +375,7 @@ def create_booking():
         })
         
     except Exception as e:
+<<<<<<< Updated upstream
         logger.error(f"Erro no endpoint MB WAY: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -349,6 +399,9 @@ def process_payshop_payment():
             
     except Exception as e:
         logger.error(f"Erro no endpoint Payshop: {str(e)}")
+=======
+        logger.error(f"Erro marcação: {str(e)}")
+>>>>>>> Stashed changes
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
