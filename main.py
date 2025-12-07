@@ -15,11 +15,14 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 
+<<<<<<< Updated upstream
 # Importar Blueprints
 from routes.booking import booking_bp
 from routes.payment import payment_bp
 from routes.services import services_bp
 
+=======
+>>>>>>> Stashed changes
 # Configuração de logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,6 +36,7 @@ CORS(app)
 
 # === ROTAS DE SAÚDE ===
 
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 # === REGISTAR BLUEPRINTS ===
 app.register_blueprint(booking_bp)
@@ -90,6 +94,16 @@ def health_check():
         "timestamp": datetime.now().isoformat()
     })
 
+=======
+@app.route('/')
+def health_check():
+    return jsonify({
+        "message": "Share2Inspire Backend - Email Corrigido",
+        "status": "online",
+        "timestamp": datetime.now().isoformat()
+    })
+
+>>>>>>> Stashed changes
 @app.route('/api/health')
 def api_health():
     return jsonify({
@@ -191,6 +205,7 @@ def send_brevo_email_simple(to_email, to_name, form_data):
 # === ROTAS IFTHENPAY (CORRIGIDAS) ===
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 @app.route('/')
 def health():
     """Endpoint de saúde"""
@@ -218,6 +233,8 @@ def not_found(error):
 def internal_error(error):
     return jsonify({"success": False, "error": "Erro interno do servidor"}), 500
 =======
+=======
+>>>>>>> Stashed changes
 @app.route('/api/ifthenpay/multibanco', methods=['POST'])
 def create_multibanco_reference():
     try:
