@@ -16,6 +16,7 @@ import traceback
 import urllib.parse
 from flask import Blueprint, request, jsonify, Response
 from dotenv import load_dotenv
+from utils.secrets import get_secret
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -30,12 +31,12 @@ IFTHENPAY_MBWAY_URL = "https://api.ifthenpay.com/spg/payment/mbway"
 IFTHENPAY_PAYSHOP_URL = "https://api.ifthenpay.com/payshop/reference/init"
 
 # Chaves da IfthenPay
-IFTHENPAY_MBWAY_KEY = os.getenv('IFTHENPAY_MBWAY_KEY', 'UWP-547025')
-IFTHENPAY_MULTIBANCO_KEY = os.getenv('IFTHENPAY_MULTIBANCO_KEY', 'BXG-350883')
-IFTHENPAY_PAYSHOP_KEY = os.getenv('IFTHENPAY_PAYSHOP_KEY', 'QTU-066969')
+IFTHENPAY_MBWAY_KEY = get_secret('IFTHENPAY_MBWAY_KEY')
+IFTHENPAY_MULTIBANCO_KEY = get_secret('IFTHENPAY_MULTIBANCO_KEY')
+IFTHENPAY_PAYSHOP_KEY = get_secret('IFTHENPAY_PAYSHOP_KEY')
 
 # Configurações do Brevo
-BREVO_API_KEY = os.getenv('BREVO_API_KEY')
+BREVO_API_KEY = get_secret('BREVO_API_KEY')
 BREVO_SENDER_NAME = os.getenv('BREVO_SENDER_NAME', 'Share2Inspire')
 BREVO_SENDER_EMAIL = os.getenv('BREVO_SENDER_EMAIL', 'noreply@share2inspire.pt')
 
@@ -451,6 +452,83 @@ def check_payment_status(order_id):
     except Exception as e:
         logger.error(f"Erro ao verificar status: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
+            
+@payment_bp.route('/multibanco', methods=['POST', 'OPTIONS'])
+def process_multibanco_payment():
+    """Endpoint específico para Multibanco (Compatibilidade)"""
+    if request.method == 'OPTIONS':
+        return handle_cors_preflight()
+    
+    try:
+        data = request.get_json() if request.is_json else request.form.to_dict()
+        normalized_data = normalize_payment_data(data)
+        
+        # Garantir que temos amount e orderId
+        if not normalized_data.get('amount') or not normalized_data.get('orderId'):
+             return jsonify({"success": False, "error": "Dados obrigatórios em falta"}), 400
+
+        result = create_multibanco_payment(normalized_data)
+        
+        if result['success']:
+             # Enviar email se sucesso
+            send_confirmation_email(normalized_data.get('email'), normalized_data.get('name'), result)
+            return jsonify(result)
+        else:
+            return jsonify(result), 500
+            
+    except Exception as e:
+        logger.error(f"Erro no endpoint Multibanco: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@payment_bp.route('/mbway', methods=['POST', 'OPTIONS'])
+def process_mbway_payment():
+    """Endpoint específico para MB WAY (Compatibilidade)"""
+    if request.method == 'OPTIONS':
+        return handle_cors_preflight()
+    
+    try:
+        data = request.get_json() if request.is_json else request.form.to_dict()
+        normalized_data = normalize_payment_data(data)
+        
+        if not normalized_data.get('amount') or not normalized_data.get('phone') or not normalized_data.get('orderId'):
+            return jsonify({"success": False, "error": "Dados obrigatórios em falta"}), 400
+            
+        result = create_mbway_payment(normalized_data)
+        
+        if result['success']:
+            send_confirmation_email(normalized_data.get('email'), normalized_data.get('name'), result)
+            return jsonify(result)
+        else:
+            return jsonify(result), 500
+            
+    except Exception as e:
+        logger.error(f"Erro no endpoint MB WAY: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@payment_bp.route('/payshop', methods=['POST', 'OPTIONS'])
+def process_payshop_payment():
+    """Endpoint específico para Payshop (Compatibilidade)"""
+    if request.method == 'OPTIONS':
+        return handle_cors_preflight()
+    
+    try:
+        data = request.get_json() if request.is_json else request.form.to_dict()
+        normalized_data = normalize_payment_data(data)
+        
+        if not normalized_data.get('amount') or not normalized_data.get('orderId'):
+            return jsonify({"success": False, "error": "Dados obrigatórios em falta"}), 400
+            
+        result = create_payshop_payment(normalized_data)
+        
+        if result['success']:
+            send_confirmation_email(normalized_data.get('email'), normalized_data.get('name'), result)
+            return jsonify(result)
+        else:
+            return jsonify(result), 500
+            
+    except Exception as e:
+        logger.error(f"Erro no endpoint Payshop: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 # Log das configurações
 logger.info("=== SISTEMA DE PAGAMENTOS CORRIGIDO CARREGADO ===")
