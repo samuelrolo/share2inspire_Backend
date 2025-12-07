@@ -21,53 +21,80 @@ api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(co
 def request_cv_review():
     try:
         print("Endpoint /api/services/cv-review chamado com método POST")
-        data = request.get_json()
-        print(f"Dados recebidos: {json.dumps(data, indent=2)}")
         
-        if not data:
-            print("Erro: Nenhum dado recebido no corpo da requisição")
-            return jsonify({"error": "Nenhum dado recebido"}), 400
+        # Verificar se é um request com arquivo (multipart/form-data)
+        if not request.content_type or 'multipart/form-data' not in request.content_type:
+             # Fallback para JSON (caso antigo ou teste)
+             data = request.get_json()
+             if not data:
+                return jsonify({"error": "Formato inválido. Esperado multipart/form-data ou JSON"}), 400
+        else:
+            # Processar multipart/form-data
+            data = request.form
+            
+        print(f"Dados recebidos: {data}")
 
         # Extrair dados do pedido
         name = data.get("name")
         email = data.get("email")
         phone = data.get("phone")
-        cv_link = data.get("cv_link")
         experience = data.get("experience")
         objectives = data.get("objectives")
+        
+        # O CV pode vir como link (JSON) ou arquivo (FormData)
+        cv_link = data.get("cv_link") 
+        cv_file = request.files.get("cv_file") if request.files else None
 
-        print(f"Dados extraídos: nome={name}, email={email}, telefone={phone}, cv_link={cv_link}")
+        print(f"Dados extraídos: nome={name}, email={email}, telefone={phone}")
 
         # Validar dados essenciais
-        if not all([name, email, cv_link, objectives]):
+        if not all([name, email, objectives]) or (not cv_link and not cv_file):
             missing = []
             if not name: missing.append("name")
             if not email: missing.append("email")
-            if not cv_link: missing.append("cv_link")
             if not objectives: missing.append("objectives")
+            if not cv_link and not cv_file: missing.append("cv_file/cv_link")
             
             print(f"Erro: Dados incompletos para revisão de CV. Campos em falta: {', '.join(missing)}")
             return jsonify({"error": f"Dados incompletos para revisão de CV. Campos em falta: {', '.join(missing)}"}), 400
 
+        # Preparar anexo se houver arquivo
+        attachment = None
+        if cv_file:
+            import base64
+            file_content = cv_file.read()
+            encoded_content = base64.b64encode(file_content).decode('utf-8')
+            attachment = [{
+                "content": encoded_content,
+                "name": cv_file.filename
+            }]
+            cv_info = f"Anexo: {cv_file.filename}"
+        else:
+            cv_info = f"Link: <a href='{cv_link}'>{cv_link}</a>"
+
         # Construir o email
         print("Construindo email para envio via Brevo...")
-        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-            to=[{"email": "srshare2inspire@gmail.com", "name": "Share2Inspire Admin"}],
-            sender={"email": os.getenv("BREVO_SENDER_EMAIL", "noreply@share2inspire.pt"), "name": "Sistema de Serviços"},
-            subject=f"Novo Pedido de Revisão de CV - {name}",
-            html_content=f"""
+        
+        email_content = f"""
             <html><body>
                 <h2>Novo Pedido de Revisão de CV Recebido</h2>
                 <p><strong>Nome:</strong> {name}</p>
                 <p><strong>Email:</strong> {email}</p>
                 <p><strong>Telefone:</strong> {phone}</p>
-                <p><strong>Link para CV:</strong> <a href="{cv_link}">{cv_link}</a></p>
+                <p><strong>CV:</strong> {cv_info}</p>
                 <p><strong>Experiência:</strong> {experience}</p>
                 <p><strong>Objetivos:</strong></p>
                 <p>{objectives}</p>
             </body></html>
-            """,
-            reply_to={"email": email, "name": name}
+            """
+
+        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+            to=[{"email": "srshare2inspire@gmail.com", "name": "Share2Inspire Admin"}],
+            sender={"email": os.getenv("BREVO_SENDER_EMAIL", "noreply@share2inspire.pt"), "name": "Sistema de Serviços"},
+            subject=f"Novo Pedido de Revisão de CV - {name}",
+            html_content=email_content,
+            reply_to={"email": email, "name": name},
+            attachment=attachment if attachment else None
         )
 
         try:
