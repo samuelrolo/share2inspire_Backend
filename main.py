@@ -29,6 +29,7 @@ CORS(app)
 
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 # === ROTAS DE EMAIL (CORRIGIDAS) ===
 
 =======
@@ -40,6 +41,16 @@ def health_check():
         "timestamp": datetime.now().isoformat()
     })
 
+=======
+@app.route('/')
+def health_check():
+    return jsonify({
+        "message": "Share2Inspire Backend - Email Corrigido",
+        "status": "online",
+        "timestamp": datetime.now().isoformat()
+    })
+
+>>>>>>> Stashed changes
 =======
 @app.route('/')
 def health_check():
@@ -62,6 +73,9 @@ def api_health():
 # === ROTAS DE EMAIL (CORRIGIDAS) ===
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -160,6 +174,7 @@ def create_multibanco_reference():
         data = request.get_json()
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
         logger.info(f"Dados recebidos para MB WAY: {data}")
         
         required_fields = ['amount', 'orderId', 'mobileNumber']
@@ -200,10 +215,24 @@ def create_multibanco_reference():
         
         logger.info(f"Resultado Multibanco: {result}")
 >>>>>>> Stashed changes
+=======
+        logger.info(f"Dados recebidos para Multibanco: {data}")
+        
+        if not data.get('amount') or not data.get('orderId'):
+            return jsonify({"success": False, "error": "Amount e orderId obrigatórios"}), 400
+        
+        result = create_multibanco_payment(
+            amount=float(data['amount']),
+            order_id=data['orderId']
+        )
+        
+        logger.info(f"Resultado Multibanco: {result}")
+>>>>>>> Stashed changes
         
         if result['success']:
             return jsonify(result)
         else:
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
             return jsonify(result), 400
@@ -213,6 +242,11 @@ def create_multibanco_reference():
             return jsonify(result), 500
             
     except Exception as e:
+=======
+            return jsonify(result), 500
+            
+    except Exception as e:
+>>>>>>> Stashed changes
 =======
             return jsonify(result), 500
             
@@ -247,6 +281,9 @@ def create_mbway_payment_endpoint():
             
     except Exception as e:
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -414,6 +451,7 @@ def create_booking():
     except Exception as e:
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
         logger.error(f"Erro no endpoint MB WAY: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -437,6 +475,9 @@ def process_payshop_payment():
             
     except Exception as e:
         logger.error(f"Erro no endpoint Payshop: {str(e)}")
+=======
+        logger.error(f"Erro marcação: {str(e)}")
+>>>>>>> Stashed changes
 =======
         logger.error(f"Erro marcação: {str(e)}")
 >>>>>>> Stashed changes
