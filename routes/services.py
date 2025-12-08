@@ -39,21 +39,36 @@ def request_cv_review():
         email = data.get("email")
         phone = data.get("phone")
         experience = data.get("experience")
-        objectives = data.get("objectives")
         
-        # Novos campos
-        sector = data.get("sector", "N/A")
+        # Mapeamento do campo de características/objetivos
+        # O formulário envia 'ad_characteristics' como principal campo de texto, mas também pode ter 'objectives'
+        ad_characteristics = data.get("ad_characteristics", "")
+        objectives = data.get("objectives", "")
+        
+        # Combinar para email se ambos existirem
+        full_context = ""
+        if ad_characteristics:
+            full_context += f"<p><strong>Características do Anúncio/Vaga:</strong><br>{ad_characteristics}</p>"
+        if objectives:
+            full_context += f"<p><strong>Objetivos da Revisão:</strong><br>{objectives}</p>"
+            
+        if not full_context:
+             full_context = "<p><em>Nenhum contexto adicional fornecido.</em></p>"
+
+        # Novos campos adicionados pelo utilizador
         current_role = data.get("current_role", "N/A")
-        ad_characteristics = data.get("ad_characteristics", "N/A")
+        sector = data.get("sector", "N/A")
         linkedin_url = data.get("linkedin_url", "N/A")
         
         # O CV pode vir como link (JSON) ou arquivo (FormData)
         cv_link = data.get("cv_link") 
         cv_file = request.files.get("cv_file") if request.files else None
+        
+        print(f"Dados extraídos: nome={name}, email={email}, telefone={phone}")
 
         # Validar dados essenciais
         if not all([name, email, phone]):
-            return jsonify({"success": False, "error": "Dados obrigatórios em falta (Nome, Email, Telefone)"}), 400
+             return jsonify({"success": False, "error": "Dados obrigatórios em falta (Nome, Email, Telefone)"}), 400
 
         # >>> 1. Iniciar Pagamento MB WAY (15.00€) <<<
         payment_data = {
@@ -71,8 +86,7 @@ def request_cv_review():
         
         if not payment_result.get('success'):
             print(f"Erro ao criar pagamento: {payment_result.get('error')}")
-            # Ainda assim, podemos querer guardar o CV? 
-            # Por agora, retornamos erro para o utilizador tentar de novo ou corrigir nr telemovel
+            # Retornamos erro se pagamento falhar
             return jsonify({"success": False, "error": f"Erro ao iniciar pagamento MB WAY: {payment_result.get('error')}"}), 400
 
         # >>> 2. Enviar Email com Anexo <<<
@@ -112,9 +126,8 @@ def request_cv_review():
                     <li><strong>Experiência:</strong> {experience}</li>
                 </ul>
 
-                <h3>Objetivos e Contexto</h3>
-                <p><strong>Objetivos da Revisão:</strong><br>{objectives}</p>
-                <p><strong>Características do Anúncio/Vaga:</strong><br>{ad_characteristics}</p>
+                <h3>Contexto</h3>
+                {full_context}
                 
                 <hr>
                 <p><strong>CV:</strong> {cv_info}</p>
@@ -204,4 +217,37 @@ def send_kickstart_email():
             
     except Exception as e:
         print(f"Erro no endpoint kickstart-email: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@services_bp.route("/analyze-cv", methods=["POST"])
+def analyze_cv():
+    try:
+        from utils.analysis import CVAnalyzer
+        
+        print("Endpoint /api/services/analyze-cv chamado")
+        
+        # Validar ficheiro
+        if 'cv_file' not in request.files:
+            return jsonify({"success": False, "error": "Ficheiro não encontrado"}), 400
+            
+        file = request.files['cv_file']
+        if file.filename == '':
+            return jsonify({"success": False, "error": "Nome de ficheiro inválido"}), 400
+
+        # Validar outros dados
+        data = request.form
+        role = data.get('current_role', '')
+        experience = data.get('experience', '')
+        
+        # Executar análise
+        analyzer = CVAnalyzer()
+        report = analyzer.analyze(file, file.filename, role, experience)
+        
+        if "error" in report:
+             return jsonify({"success": False, "error": report["error"]}), 400
+
+        return jsonify({"success": True, "report": report}), 200
+
+    except Exception as e:
+        print(f"Erro na análise de CV: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
