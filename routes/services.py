@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 # Carregar variáveis de ambiente
 load_dotenv()
 
-services_bp = Blueprint("services", __name__, url_prefix="/api/services")
+services_bp = Blueprint("services", __name__)
 
 # Configuração da API Brevo (Sendinblue)
 configuration = sib_api_v3_sdk.Configuration()
