@@ -119,3 +119,54 @@ def request_cv_review():
     except Exception as e:
         print(f"Erro global no endpoint /cv-review: {e}")
         return jsonify({"error": "Ocorreu um erro no servidor.", "details": str(e)}), 500
+
+@services_bp.route("/kickstart-email", methods=["POST"])
+def send_kickstart_email():
+    try:
+        data = request.get_json()
+        print(f"Dados recebidos para email Kickstart: {data}")
+        
+        if not data:
+            return jsonify({"success": False, "error": "Dados não recebidos"}), 400
+            
+        email = data.get('email')
+        name = data.get('name')
+        
+        if not email or not name:
+            return jsonify({"success": False, "error": "Email e Nome obrigatórios"}), 400
+            
+        # Construir o email
+        subject = "Confirmação - Kickstart Pro Share2Inspire"
+        html_content = f"""
+        <html><body>
+            <h2>Obrigado pelo seu interesse no Kickstart Pro!</h2>
+            <p>Olá {name},</p>
+            <p>Recebemos a sua marcação para o Kickstart Pro. Entraremos em contacto brevemente.</p>
+            <p><strong>Detalhes:</strong></p>
+            <ul>
+                <li>Nome: {name}</li>
+                <li>Email: {email}</li>
+                <li>Data: {data.get('date', 'A definir')}</li>
+                <li>Duração: {data.get('duration', '30 minutos')}</li>
+            </ul>
+            <p>Cumprimentos,<br>Equipa Share2Inspire</p>
+        </body></html>
+        """
+        
+        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+            to=[{"email": email, "name": name}],
+            sender={"email": os.getenv("BREVO_SENDER_EMAIL", "noreply@share2inspire.pt"), "name": "Share2Inspire"},
+            subject=subject,
+            html_content=html_content
+        )
+        
+        try:
+            api_instance.send_transac_email(send_smtp_email)
+            return jsonify({"success": True, "message": "Email enviado com sucesso"})
+        except ApiException as e:
+            print(f"Erro Brevo: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
+            
+    except Exception as e:
+        print(f"Erro no endpoint kickstart-email: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
