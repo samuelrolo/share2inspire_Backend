@@ -80,7 +80,7 @@ def normalize_payment_data(data):
     field_map = {
         'name': ['name', 'nome', 'customerName', 'customer_name'],
         'email': ['email', 'customerEmail', 'customer_email'],
-        'phone': ['phone', 'telefone', 'customerPhone', 'customer_phone'],
+        'phone': ['phone', 'telefone', 'customerPhone', 'customer_phone', 'mobileNumber', 'mobile_number'],
         'amount': ['amount', 'valor', 'price'],
         'orderId': ['orderId', 'order_id', 'id'],
         'paymentMethod': ['paymentMethod', 'payment_method', 'method'],
