@@ -10,19 +10,13 @@ env_variables:
   FLASK_DEBUG: "False"
   
   # Configurações de email (Brevo)
-  BREVO_API_KEY: "CHANGE_ME"
+  # BREVO_API_KEY removido para usar Secret Manager
   BREVO_SENDER_EMAIL: "srshare2inspire@gmail.com"
   BREVO_SENDER_NAME: "Share2Inspire"
   
-  # Configurações Ifthenpay
-  IFTHENPAY_GATEWAY_KEY: "CHANGE_ME"
-  IFTHENPAY_CALLBACK_KEY: "CHANGE_ME"
-  IFTHENPAY_MBWAY_KEY: "CHANGE_ME"
-  IFTHENPAY_PAYSHOP_KEY: "CHANGE_ME"
-  IFTHENPAY_MULTIBANCO_KEY: "CHANGE_ME"
+  # Configurações Ifthenpay (Segredos movidos para Secret Manager)
   
-  # Chave secreta Flask
-  FLASK_SECRET_KEY: "CHANGE_ME"
+  # Chave secreta Flask (Movido para Secret Manager)
 
 # Handlers simplificados
 handlers:
