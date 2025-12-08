@@ -60,7 +60,10 @@ class CVAnalyzer:
                 print(f"Erro na análise AI: {e}. Falling back to heuristics.")
         
         # 2. Fallback to Heuristics
-        return self._analyze_heuristics(clean_text, role, experience_level)
+        result = self._analyze_heuristics(clean_text, role, experience_level)
+        result["analysis_type"] = "heuristic"
+        result["ai_error"] = "Gemini Model not initialized (Check API Key)" if not self.model else "AI generation failed"
+        return result
 
     def _analyze_with_ai(self, text, role, experience):
         prompt = f"""
@@ -96,7 +99,9 @@ class CVAnalyzer:
         elif "```" in content:
             content = content.replace("```", "")
             
-        return json.loads(content)
+        data = json.loads(content)
+        data["analysis_type"] = "ai"
+        return data
 
     def _analyze_heuristics(self, text, role, experience_level):
         clean_text = text.lower()
