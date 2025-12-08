@@ -20,16 +20,16 @@ api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(co
 @services_bp.route("/cv-review", methods=["POST"])
 def request_cv_review():
     try:
+        from routes.payment import create_mbway_payment, normalize_payment_data
+
         print("Endpoint /api/services/cv-review chamado com método POST")
         
         # Verificar se é um request com arquivo (multipart/form-data)
         if not request.content_type or 'multipart/form-data' not in request.content_type:
-             # Fallback para JSON (caso antigo ou teste)
              data = request.get_json()
              if not data:
-                return jsonify({"error": "Formato inválido. Esperado multipart/form-data ou JSON"}), 400
+                return jsonify({"error": "Formato inválido. Esperado multipart/form-data"}), 400
         else:
-            # Processar multipart/form-data
             data = request.form
             
         print(f"Dados recebidos: {data}")
@@ -41,25 +41,46 @@ def request_cv_review():
         experience = data.get("experience")
         objectives = data.get("objectives")
         
+        # Novos campos
+        sector = data.get("sector", "N/A")
+        current_role = data.get("current_role", "N/A")
+        ad_characteristics = data.get("ad_characteristics", "N/A")
+        linkedin_url = data.get("linkedin_url", "N/A")
+        
         # O CV pode vir como link (JSON) ou arquivo (FormData)
         cv_link = data.get("cv_link") 
         cv_file = request.files.get("cv_file") if request.files else None
 
-        print(f"Dados extraídos: nome={name}, email={email}, telefone={phone}")
-
         # Validar dados essenciais
-        if not all([name, email, objectives]) or (not cv_link and not cv_file):
-            missing = []
-            if not name: missing.append("name")
-            if not email: missing.append("email")
-            if not objectives: missing.append("objectives")
-            if not cv_link and not cv_file: missing.append("cv_file/cv_link")
-            
-            print(f"Erro: Dados incompletos para revisão de CV. Campos em falta: {', '.join(missing)}")
-            return jsonify({"error": f"Dados incompletos para revisão de CV. Campos em falta: {', '.join(missing)}"}), 400
+        if not all([name, email, phone]):
+            return jsonify({"success": False, "error": "Dados obrigatórios em falta (Nome, Email, Telefone)"}), 400
 
-        # Preparar anexo se houver arquivo
+        # >>> 1. Iniciar Pagamento MB WAY (15.00€) <<<
+        payment_data = {
+            "amount": "15.00",
+            "orderId": data.get("orderId", f"CV-{name.replace(' ', '')}"),
+            "phone": phone,
+            "email": email,
+            "description": f"Revisao CV - {name}"
+        }
+        
+        # Normalizar e criar pagamento
+        print(f"Iniciando pagamento MB WAY para {name}...")
+        normalized_payment = normalize_payment_data(payment_data)
+        payment_result = create_mbway_payment(normalized_payment)
+        
+        if not payment_result.get('success'):
+            print(f"Erro ao criar pagamento: {payment_result.get('error')}")
+            # Ainda assim, podemos querer guardar o CV? 
+            # Por agora, retornamos erro para o utilizador tentar de novo ou corrigir nr telemovel
+            return jsonify({"success": False, "error": f"Erro ao iniciar pagamento MB WAY: {payment_result.get('error')}"}), 400
+
+        # >>> 2. Enviar Email com Anexo <<<
+        
+        # Preparar anexo
         attachment = None
+        cv_info = "Nenhum ficheiro enviado"
+        
         if cv_file:
             import base64
             file_content = cv_file.read()
@@ -69,56 +90,70 @@ def request_cv_review():
                 "name": cv_file.filename
             }]
             cv_info = f"Anexo: {cv_file.filename}"
-        else:
+        elif cv_link:
             cv_info = f"Link: <a href='{cv_link}'>{cv_link}</a>"
 
-        # Construir o email
-        print("Construindo email para envio via Brevo...")
-        
         email_content = f"""
             <html><body>
-                <h2>Novo Pedido de Revisão de CV Recebido</h2>
-                <p><strong>Nome:</strong> {name}</p>
-                <p><strong>Email:</strong> {email}</p>
-                <p><strong>Telefone:</strong> {phone}</p>
+                <h2>Novo Pedido de Revisão de CV (Pendente Pagamento)</h2>
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+                    <p><strong>Status Pagamento:</strong> Iniciado (MB WAY 15.00€)</p>
+                    <p><strong>Referência Pedido:</strong> {payment_data['orderId']}</p>
+                </div>
+                
+                <h3>Dados do Candidato</h3>
+                <ul>
+                    <li><strong>Nome:</strong> {name}</li>
+                    <li><strong>Email:</strong> {email}</li>
+                    <li><strong>Telefone:</strong> {phone}</li>
+                    <li><strong>LinkedIn:</strong> {linkedin_url}</li>
+                    <li><strong>Função Atual:</strong> {current_role}</li>
+                    <li><strong>Setor:</strong> {sector}</li>
+                    <li><strong>Experiência:</strong> {experience}</li>
+                </ul>
+
+                <h3>Objetivos e Contexto</h3>
+                <p><strong>Objetivos da Revisão:</strong><br>{objectives}</p>
+                <p><strong>Características do Anúncio/Vaga:</strong><br>{ad_characteristics}</p>
+                
+                <hr>
                 <p><strong>CV:</strong> {cv_info}</p>
-                <p><strong>Experiência:</strong> {experience}</p>
-                <p><strong>Objetivos:</strong></p>
-                <p>{objectives}</p>
             </body></html>
             """
 
         send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
             to=[{"email": "srshare2inspire@gmail.com", "name": "Share2Inspire Admin"}],
             sender={"email": os.getenv("BREVO_SENDER_EMAIL", "noreply@share2inspire.pt"), "name": "Sistema de Serviços"},
-            subject=f"Novo Pedido de Revisão de CV - {name}",
+            subject=f"Revisão CV - {name} (Aguardar Pagamento)",
             html_content=email_content,
             reply_to={"email": email, "name": name},
             attachment=attachment if attachment else None
         )
 
         try:
-            print("Tentando enviar email via API Brevo...")
-            api_response = api_instance.send_transac_email(send_smtp_email)
-            print(f"Email de revisão de CV enviado via Brevo. Resposta: {api_response}")
-            return jsonify({"message": "Pedido de revisão de CV recebido com sucesso! Entraremos em contacto brevemente."}), 200
-        except ApiException as e:
-            print(f"Erro ao enviar email de revisão de CV via Brevo: {e}")
-            error_body = e.body
-            error_status = e.status
-            print(f"Status: {error_status}, Body: {error_body}")
+            api_instance.send_transac_email(send_smtp_email)
+            print("Email enviado com sucesso.")
             
+            # Sucesso total
             return jsonify({
-                "error": "Ocorreu um erro de comunicação ao tentar enviar o pedido. Verifique a sua ligação à internet e tente novamente.", 
-                "details": str(e),
-                "status": error_status
-            }), 500
-        except Exception as e:
-            print(f"Erro inesperado ao processar pedido de revisão de CV: {e}")
-            return jsonify({"error": "Ocorreu um erro inesperado.", "details": str(e)}), 500
+                "success": True, 
+                "message": "Isso", 
+                "payment": payment_result
+            }), 200
+            
+        except ApiException as e:
+            print(f"Erro Brevo: {e}")
+            # Se o email falhar, mas o pagamento foi iniciado, avisamos o user
+            return jsonify({
+                "success": True, 
+                "message": "Pagamento iniciado, mas erro ao enviar email de confirmação. Contacte o suporte.",
+                "payment": payment_result,
+                "warning": str(e)
+            }), 200
+
     except Exception as e:
         print(f"Erro global no endpoint /cv-review: {e}")
-        return jsonify({"error": "Ocorreu um erro no servidor.", "details": str(e)}), 500
+        return jsonify({"success": False, "error": "Erro interno do servidor", "details": str(e)}), 500
 
 @services_bp.route("/kickstart-email", methods=["POST"])
 def send_kickstart_email():
