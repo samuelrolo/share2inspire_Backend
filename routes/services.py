@@ -8,11 +8,14 @@ from dotenv import load_dotenv
 # Carregar variáveis de ambiente
 load_dotenv()
 
+from utils.secrets import get_secret
+
 services_bp = Blueprint("services", __name__)
 
 # Configuração da API Brevo (Sendinblue)
 configuration = sib_api_v3_sdk.Configuration()
-api_key = os.getenv("BREVO_API_KEY")
+# Tentar obter do Secret Manager (ou env var)
+api_key = get_secret("BREVO_API_KEY")
 configuration.api_key["api-key"] = api_key
 
 api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
