@@ -67,41 +67,73 @@ class CVAnalyzer:
 
     def _analyze_with_ai(self, text, role, experience):
         prompt = f"""
-        Act as an expert Career Coach and CV Analyst. Analyze the following CV content for a professional targeting the role of '{role}' with '{experience}' of experience.
-        
+        You are an elite Executive Career Coach with 20+ years of experience in Talent Acquisition for Fortune 500 companies.
+        Analyze the following CV content for a professional targeting the role of '{role}' with '{experience}' of experience.
+
         CV Content:
         {text}
 
-        You must strictly output ONLY a JSON object with the following structure. Do not output markdown code blocks, just the raw JSON.
-        
-        Structure Requirements:
-        1. "global_score": 0-100 (weighted average of dimensions).
-        2. "score_band": "Excelente" (85-100), "Forte" (70-84), "Adequado" (50-69), or "Necessita Revisão" (0-49).
-        3. "dimensions": Object with 0-20 scores for: "structure", "content", "ats", "impact", "branding", "risks".
-        4. "insights": Object with keys "structure", "content", "ats", "impact", "branding", "risks". Each key maps to an object with lists: "signal_strength" (what is good), "missing_pieces" (what is missing), "upgrade_suggestions" (actionable tips).
-        5. "premium_indicators": Object with "value_proposition_index" (0-10), "professional_maturity" (string), "result_density" (string %), "narrative_consistency" (string).
-        6. "roadmap": Object with lists "quick_wins", "intermediate", "deep".
-        7. "executive_summary": List of exactly 3 strings (Strength, Blocker, Competitive Advantage Focus).
+        Your goal is to provide a "Tough Love", professional, and highly specific analysis. Avoid generic fluff. Be direct about what is missing.
 
-        Criteria:
-        - Penalize generic descriptions.
-        - Reward quantitative metrics (impact).
-        - Check alignment with '{role}'.
-        - Be critical but constructive.
+        You MUST output ONLY a valid JSON object with the following structure:
+
+        {{
+            "global_score": <int 0-100>,
+            "score_band": <string "Excelente" (90-100) | "Bom" (70-89) | "Razoável" (50-69) | "Fraco" (0-49)>,
+            "summary_text": <string: A 2-sentence professional summary of the CV's current state>,
+            "dimensions": {{
+                "structure": <int 0-100>,
+                "content_relevance": <int 0-100>,
+                "impact_metrics": <int 0-100>,
+                "ats_compatibility": <int 0-100>,
+                "visual_clarity": <int 0-100>
+            }},
+            "key_strengths": [
+                <string: Specific strength 1>,
+                <string: Specific strength 2>
+            ],
+            "critical_improvements": [
+                <string: High priority fix 1>,
+                <string: High priority fix 2>,
+                <string: High priority fix 3>
+            ],
+            "ats_keywords_missing": [
+                <string: keyword 1>,
+                <string: keyword 2>,
+                <string: keyword 3>
+            ]
+        }}
         """
         
-        response = self.model.generate_content(prompt)
-        
-        # Clean response (sometimes it comes with ```json ... ```)
-        content = response.text
-        if "```json" in content:
-            content = content.replace("```json", "").replace("```", "")
-        elif "```" in content:
-            content = content.replace("```", "")
+        try:
+            response = self.model.generate_content(prompt)
+            content = response.text
             
+<<<<<<< Updated upstream
         data = json.loads(content)
         data["analysis_type"] = "ai"
         return data
+=======
+            # Clean response
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0]
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0]
+                
+            return json.loads(content.strip())
+        except Exception as e:
+            print(f"Error parsing AI response: {e}")
+            # Return a fallback structure so frontend doesn't break
+            return {
+                "global_score": 50,
+                "score_band": "Erro na Análise",
+                "summary_text": "Não foi possível processar a análise detalhada neste momento.",
+                "dimensions": {k: 50 for k in ["structure", "content_relevance", "impact_metrics", "ats_compatibility", "visual_clarity"]},
+                "key_strengths": ["N/A"],
+                "critical_improvements": ["Tente novamente"],
+                "ats_keywords_missing": []
+            }
+>>>>>>> Stashed changes
 
     def _analyze_heuristics(self, text, role, experience_level):
         clean_text = text.lower()
