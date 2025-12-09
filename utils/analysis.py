@@ -110,10 +110,13 @@ class CVAnalyzer:
             content = response.text
             
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
         data = json.loads(content)
         data["analysis_type"] = "ai"
         return data
 =======
+=======
+>>>>>>> Stashed changes
             # Clean response
             if "```json" in content:
                 content = content.split("```json")[1].split("```")[0]
@@ -133,6 +136,9 @@ class CVAnalyzer:
                 "critical_improvements": ["Tente novamente"],
                 "ats_keywords_missing": []
             }
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 
     def _analyze_heuristics(self, text, role, experience_level):
