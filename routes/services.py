@@ -43,6 +43,10 @@ def request_cv_review():
         phone = data.get("phone")
         experience = data.get("experience")
         
+        # Dados de Serviço e Pagamento Dinâmicos
+        service_name = data.get("service", "Revisão de CV") # Ex: "Revisão de CV", "Pack Completo"
+        amount = data.get("amount", "20.00") # Default atualizado para 20.00
+        
         # Mapeamento do campo de características/objetivos
         # O formulário envia 'ad_characteristics' como principal campo de texto, mas também pode ter 'objectives'
         ad_characteristics = data.get("ad_characteristics", "")
@@ -67,23 +71,23 @@ def request_cv_review():
         cv_link = data.get("cv_link") 
         cv_file = request.files.get("cv_file") if request.files else None
         
-        print(f"Dados extraídos: nome={name}, email={email}, telefone={phone}")
+        print(f"Dados extraídos: nome={name}, email={email}, telefone={phone}, serviço={service_name}, valor={amount}")
 
         # Validar dados essenciais
         if not all([name, email, phone]):
              return jsonify({"success": False, "error": "Dados obrigatórios em falta (Nome, Email, Telefone)"}), 400
 
-        # >>> 1. Iniciar Pagamento MB WAY (15.00€) <<<
+        # >>> 1. Iniciar Pagamento MB WAY <<<
         payment_data = {
-            "amount": "15.00",
-            "orderId": data.get("orderId", f"CV-{name.replace(' ', '')}"),
+            "amount": amount,
+            "orderId": data.get("orderId", f"CV-{name.replace(' ', '')}-{int(pd.Timestamp.now().timestamp())}" if 'pd' in locals() else f"CV-{name.replace(' ', '')}"),
             "phone": phone,
             "email": email,
-            "description": f"Revisao CV - {name}"
+            "description": f"{service_name} - {name}"
         }
         
         # Normalizar e criar pagamento
-        print(f"Iniciando pagamento MB WAY para {name}...")
+        print(f"Iniciando pagamento MB WAY de {amount}€ para {name}...")
         normalized_payment = normalize_payment_data(payment_data)
         payment_result = create_mbway_payment(normalized_payment)
         
@@ -112,10 +116,11 @@ def request_cv_review():
 
         email_content = f"""
             <html><body>
-                <h2>Novo Pedido de Revisão de CV (Pendente Pagamento)</h2>
+                <h2>Novo Pedido: {service_name} (Pendente Pagamento)</h2>
                 <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
-                    <p><strong>Status Pagamento:</strong> Iniciado (MB WAY 15.00€)</p>
+                    <p><strong>Status Pagamento:</strong> Iniciado (MB WAY {amount}€)</p>
                     <p><strong>Referência Pedido:</strong> {payment_data['orderId']}</p>
+                    <p><strong>Serviço:</strong> {service_name}</p>
                 </div>
                 
                 <h3>Dados do Candidato</h3>
@@ -140,7 +145,7 @@ def request_cv_review():
         send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
             to=[{"email": "srshare2inspire@gmail.com", "name": "Share2Inspire Admin"}],
             sender={"email": os.getenv("BREVO_SENDER_EMAIL", "noreply@share2inspire.pt"), "name": "Sistema de Serviços"},
-            subject=f"Revisão CV - {name} (Aguardar Pagamento)",
+            subject=f"{service_name} - {name} (Aguardar Pagamento)",
             html_content=email_content,
             reply_to={"email": email, "name": name},
             attachment=attachment if attachment else None
