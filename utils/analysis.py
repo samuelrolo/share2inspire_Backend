@@ -66,42 +66,82 @@ class CVAnalyzer:
         return result
 
     def _analyze_with_ai(self, text, role, experience):
+        # Definição do Prompt Complexo com Persona e Estrutura JSON
         prompt = f"""
-        You are an elite Executive Career Coach with 20+ years of experience in Talent Acquisition for Fortune 500 companies.
-        Analyze the following CV content for a professional targeting the role of '{role}' with '{experience}' of experience.
-
-        CV Content:
-        {text}
-
-        Your goal is to provide a "Tough Love", professional, and highly specific analysis. Avoid generic fluff. Be direct about what is missing.
-
-        You MUST output ONLY a valid JSON object with the following structure:
-
+        Act as a Senior Recruitment Specialist, Career Consultant, and ATS Expert with specific experience in strategic consulting, technology, and organizational transformation in international markets.
+        
+        OBJECTIVE:
+        Analyze the following CV content for a professional targeting the role/sector of '{role}' with '{experience}' of experience.
+        Produce a professional, in-depth, result-oriented assessment suitable for mid-to-high seniority profiles.
+        
+        INPUT CONTEXT:
+        CV Text: {text[:15000]} (truncated if too long)
+        Target Role: {role}
+        Experience Level: {experience}
+        
+        OUTPUT LANGUAGE: Portuguese (Portugal) - Professional, clear, non-generic.
+        
+        MANDATORY OUTPUT STRUCTURE (JSON ONLY):
+        You must output ONLY a valid JSON object with the following schema. Do not include markdown code blocks like ```json.
+        
         {{
-            "global_score": <int 0-100>,
-            "score_band": <string "Excelente" (90-100) | "Bom" (70-89) | "Razoável" (50-69) | "Fraco" (0-49)>,
-            "summary_text": <string: A 2-sentence professional summary of the CV's current state>,
-            "dimensions": {{
-                "structure": <int 0-100>,
-                "content_relevance": <int 0-100>,
-                "impact_metrics": <int 0-100>,
-                "ats_compatibility": <int 0-100>,
-                "visual_clarity": <int 0-100>
+            "executive_summary": {{
+                "vision": "Resumo curto e objetivo do posicionamento do candidato no mercado (2-3 frases).",
+                "market_fit_percentage": <int 0-100>,
+                "strategic_read": "Leitura estratégica do perfil, senioridade percebida e coerência global."
             }},
-            "key_strengths": [
-                <string: Specific strength 1>,
-                <string: Specific strength 2>
+            "ats_compatibility": {{
+                "score": <int 0-100>,
+                "explanation": "Explicação clara dos fatores que aumentam ou reduzem a pontuação.",
+                "risk_analysis": "Risco estimado de exclusão automática (Baixo/Médio/Alto) e porquê."
+            }},
+            "structural_analysis": {{
+                "clarity_score": <int 0-100>,
+                "organization_feedback": "Avaliação da organização das secções.",
+                "legibility_feedback": "Legibilidade técnica para humanos e ATS."
+            }},
+            "content_impact": {{
+                "title_strength": "Avaliação da força dos títulos.",
+                "metrics_presence": "Avaliação sobre a presença de métricas/resultados (Fraca/Moderada/Forte).",
+                "verb_power": "Uso de verbos de ação adequados à senioridade.",
+                "alignment_feedback": "Alinhamento entre experiência e setor alvo."
+            }},
+            "keywords": {{
+                "missing": ["palavra1", "palavra2", "palavra3", "palavra4", "palavra5"],
+                "suggested_alternatives": ["termo1", "termo2"],
+                "language_balance_feedback": "Equilíbrio entre linguagem humana e algorítmica."
+            }},
+            "strengths": [
+                "Ponto forte diferenciador 1",
+                "Ponto forte diferenciador 2",
+                "Ponto forte diferenciador 3"
             ],
-            "critical_improvements": [
-                <string: High priority fix 1>,
-                <string: High priority fix 2>,
-                <string: High priority fix 3>
+            "improvements": [
+                {{
+                    "area": "Área de melhoria (ex: Resumo, Experiência)",
+                    "impact": "Crítico" | "Alto" | "Médio",
+                    "description": "Explicação do problema."
+                }},
+                {{ "area": "...", "impact": "...", "description": "..." }},
+                {{ "area": "...", "impact": "...", "description": "..." }}
             ],
-            "ats_keywords_missing": [
-                <string: keyword 1>,
-                <string: keyword 2>,
-                <string: keyword 3>
-            ]
+            "recommendations": [
+                {{
+                    "section_target": "Secção alvo (ex: Experiência Profissional)",
+                    "actionable_tip": "Sugestão concreta do que fazer.",
+                    "example": "Exemplo de frase ou formatação melhorada."
+                }},
+                {{ "section_target": "...", "actionable_tip": "...", "example": "..." }}
+            ],
+            "strategic_tips": [
+                "Dica estratégica 1 (não genérica)",
+                "Dica estratégica 2",
+                "Dica estratégica 3"
+            ],
+            "final_assessment": {{
+                "score": <int 0-100> (Readiness Index),
+                "readiness_level": "Base sólida" | "Competitivo" | "Alto potencial" | "Pronto para mercado"
+            }}
         }}
         """
         
@@ -109,71 +149,93 @@ class CVAnalyzer:
             response = self.model.generate_content(prompt)
             content = response.text
             
-            # Clean response
-            if "```json" in content:
-                content = content.split("```json")[1].split("```")[0]
-            elif "```" in content:
-                content = content.split("```")[1].split("```")[0]
+            # Limpeza robusta do JSON
+            content = content.strip()
+            if content.startswith("```json"):
+                content = content[7:]
+            if content.startswith("```"):
+                content = content[3:]
+            if content.endswith("```"):
+                content = content[:-3]
                 
             return json.loads(content.strip())
         except Exception as e:
             print(f"Error parsing AI response: {e}")
-            # Return a fallback structure so frontend doesn't break
-            return {
-                "global_score": 50,
-                "score_band": "Erro na Análise",
-                "summary_text": "Não foi possível processar a análise detalhada neste momento.",
-                "dimensions": {k: 50 for k in ["structure", "content_relevance", "impact_metrics", "ats_compatibility", "visual_clarity"]},
-                "key_strengths": ["N/A"],
-                "critical_improvements": ["Tente novamente"],
-                "ats_keywords_missing": []
-            }
+            return self._analyze_heuristics(text, role, experience) # Fallback seguro
 
     def _analyze_heuristics(self, text, role, experience_level):
+        """Fallback estruturado para quando a AI falha ou não está configurada."""
         clean_text = text.lower()
         
-        scores = {
-            "structure": self._score_structure(clean_text),
-            "content": self._score_content(clean_text, role),
-            "ats": 15, # Optimistic default
-            "impact": self._score_impact(clean_text),
-            "branding": self._score_branding(clean_text),
-            "risks": 18 # Optimistic default
-        }
+        # Lógica simplificada de scores
+        structure_score = self._score_structure(clean_text) * 5 # Scale to 100 roughly
+        metrics_count = len(self.metrics_pattern.findall(text))
+        impact_score = min(100, metrics_count * 10)
         
-        global_score = sum(scores.values()) # Approx sum to 100ish
-        global_score = min(100, max(0, int(global_score)))
-
+        # Estrutura compatível com o output da AI
         return {
-            "global_score": global_score,
-            "score_band": self._get_score_band(global_score),
-            "dimensions": scores,
-            "insights": self._generate_heuristic_insights(scores),
-            "premium_indicators": {
-                "value_proposition_index": 7,
-                "professional_maturity": "Adequado",
-                "result_density": "15%",
-                "narrative_consistency": "Linear"
+            "executive_summary": {
+                "vision": "Análise preliminar automatizada (Modo Simplificado). O perfil apresenta elementos base, mas requer revisão humana detalhada.",
+                "market_fit_percentage": 50,
+                "strategic_read": "O CV possui estrutura legível. Recomenda-se adicionar métricas quantitativas para elevar a senioridade percebida."
             },
-            "roadmap": {
-                "quick_wins": ["Use um template mais limpo"],
-                "intermediate": ["Adicione métricas nas experiências"],
-                "deep": ["Reescreva o perfil profissional"]
+            "ats_compatibility": {
+                "score": 60,
+                "explanation": "Formato de texto extraído com sucesso. Estrutura parece standard.",
+                "risk_analysis": "Médio. Evite colunas complexas ou gráficos que dificultem a leitura."
             },
-            "executive_summary": [
-                "O CV apresenta uma estrutura base funcional.",
-                "Falta diferenciação através de resultados quantitativos.",
-                "Foques em demonstrar impacto direto nos projetos anteriores."
-            ]
+            "structural_analysis": {
+                "clarity_score": structure_score,
+                "organization_feedback": "Secções padrão identificadas. Garanta que o Resumo Profissional está no topo.",
+                "legibility_feedback": "Utilize fontes padrão e evite blocos densos de texto."
+            },
+            "content_impact": {
+                "title_strength": "Verificar se os títulos dos cargos são padrão de mercado.",
+                "metrics_presence": "Moderada" if metrics_count > 2 else "Fraca",
+                "verb_power": "Use verbos de ação como 'Liderei', 'Desenvolvi', 'Aumentei'.",
+                "alignment_feedback": f"Verificar alinhamento com {role}."
+            },
+            "keywords": {
+                "missing": ["Liderança", "Estratégia", "Gestão de Projetos", "Inglês", "Orçamento"] if "gestão" not in clean_text else [],
+                "suggested_alternatives": ["Management", "Leadership"],
+                "language_balance_feedback": "Certifique-se de usar a terminologia técnica da sua área."
+            },
+            "strengths": [
+                "Estrutura base identificável",
+                "Informações de contacto presentes"
+            ],
+            "improvements": [
+                {
+                    "area": "Impacto e Resultados",
+                    "impact": "Alto",
+                    "description": "Falta de quantificação de resultados (números, %, valores)."
+                },
+                {
+                    "area": "Palavras-chave",
+                    "impact": "Médio",
+                    "description": "Pode precisar de mais termos técnicos específicos da vaga."
+                }
+            ],
+            "recommendations": [
+                {
+                    "section_target": "Experiência Profissional",
+                    "actionable_tip": "Transforme responsabilidades em conquistas.",
+                    "example": "Em vez de 'Responsável por vendas', use 'Aumentei as vendas em 20%'."
+                }
+            ],
+            "strategic_tips": [
+                "Adapte o CV para cada candidatura.",
+                "Mantenha o CV em no máximo 2 páginas.",
+                "Revise a gramática cuidadosamente."
+            ],
+            "final_assessment": {
+                "score": int((structure_score + impact_score + 60) / 3),
+                "readiness_level": "Base sólida"
+            },
+            "is_fallback": True
         }
 
-    def _get_score_band(self, score):
-        if score >= 85: return "Excelente"
-        if score >= 70: return "Forte"
-        if score >= 50: return "Adequado"
-        return "Necessita Revisão"
-
-    # --- Heuristic Helpers (Simplified) ---
+    # --- Heuristic Helpers (Mantidos) ---
     def _score_structure(self, text):
         score = 10
         found_sections = sum(1 for keys in self.sections.values() if any(k in text for k in keys))
@@ -193,6 +255,3 @@ class CVAnalyzer:
     def _score_branding(self, text):
         return 10 + (5 if any(k in text for k in self.sections["summary"]) else 0)
 
-    def _generate_heuristic_insights(self, scores):
-        # Return generic structure to avoid frontend crash
-        return {k: {"signal_strength": [], "missing_pieces": [], "upgrade_suggestions": []} for k in scores.keys()}
