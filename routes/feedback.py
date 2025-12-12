@@ -8,6 +8,8 @@ from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from dotenv import load_dotenv
 
+from utils.secrets import get_secret
+
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -19,7 +21,7 @@ feedback_bp = Blueprint("feedback", __name__, url_prefix="/api/feedback")
 
 # Configuração da API Brevo (Sendinblue)
 configuration = sib_api_v3_sdk.Configuration()
-api_key = os.getenv("BREVO_API_KEY")
+api_key = get_secret("BREVO_API_KEY")
 configuration.api_key["api-key"] = api_key
 
 # Verificar se a chave API foi carregada
