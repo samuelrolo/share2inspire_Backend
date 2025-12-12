@@ -30,7 +30,13 @@ app.register_blueprint(payment_bp, url_prefix='/api/payment')
 # /api/booking/...
 app.register_blueprint(booking_bp, url_prefix='/api/booking')
 # /api/services/...
+# /api/services/...
 app.register_blueprint(services_bp, url_prefix='/api/services')
+
+# /api/feedback/...
+from routes.feedback import feedback_bp
+if feedback_bp:
+    app.register_blueprint(feedback_bp, url_prefix='/api/feedback')
 
 
 # === ROTAS DE SAÚDE ===
