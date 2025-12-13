@@ -17,6 +17,7 @@ def get_secret(secret_id, default=None, project_id=None):
     # 1. Tentar variável de ambiente
     env_val = os.getenv(secret_id)
     if env_val:
+        logger.info(f"Secret '{secret_id}' obtained from environment variable: {env_val[:10]}...")
         return env_val
         
     # 2. Tentar Secret Manager
@@ -29,11 +30,13 @@ def get_secret(secret_id, default=None, project_id=None):
             logger.warning(f"GOOGLE_CLOUD_PROJECT não definido. Não é possível buscar '{secret_id}' no Secret Manager.")
             return default
 
+        logger.info(f"Fetching secret '{secret_id}' from project '{project_id}'...")
         client = secretmanager.SecretManagerServiceClient()
         name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
         
         response = client.access_secret_version(request={"name": name})
-        secret_val = response.payload.data.decode("UTF-8")
+        secret_val = response.payload.data.decode("UTF-8").strip()
+        logger.info(f"Secret '{secret_id}' obtained from Secret Manager: {secret_val[:10]}...")
         
         return secret_val
         
