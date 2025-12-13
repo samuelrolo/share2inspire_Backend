@@ -12,18 +12,22 @@ from utils.secrets import get_secret
 
 booking_bp = Blueprint("booking", __name__)
 
-# Configuração da API Brevo (Sendinblue)
-configuration = sib_api_v3_sdk.Configuration()
-api_key = get_secret("BREVO_API_KEY")
-configuration.api_key["api-key"] = api_key
+# Lazy initialization for Brevo API
+_api_instance = None
 
-# Verificar se a chave API foi carregada
-if not configuration.api_key["api-key"]:
-    print("ALERTA: A variável de ambiente BREVO_API_KEY não está definida!")
-else:
-    print(f"BREVO_API_KEY carregada com sucesso: {api_key[:3]}{'*' * (len(api_key) - 3)}")
-
-api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
+def get_brevo_api():
+    """Lazily initialize the Brevo API client to ensure fresh secret access."""
+    global _api_instance
+    if _api_instance is None:
+        configuration = sib_api_v3_sdk.Configuration()
+        api_key = get_secret("BREVO_API_KEY")
+        if not api_key:
+            print("ALERTA: BREVO_API_KEY não está definida!")
+        else:
+            print(f"BREVO_API_KEY carregada: {api_key[:10]}...")
+        configuration.api_key["api-key"] = api_key
+        _api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
+    return _api_instance
 
 @booking_bp.route("/schedule", methods=["POST"])
 def schedule_appointment():
@@ -81,7 +85,7 @@ def schedule_appointment():
 
         try:
             print("Tentando enviar email via API Brevo...")
-            api_response = api_instance.send_transac_email(send_smtp_email)
+            api_response = get_brevo_api().send_transac_email(send_smtp_email)
             print(f"Email de agendamento enviado via Brevo. Resposta: {api_response}")
             return jsonify({"message": "Agendamento recebido com sucesso! Entraremos em contacto brevemente."}), 200
         except ApiException as e:
@@ -140,7 +144,7 @@ def book_kickstart():
         )
         
         try:
-            api_instance.send_transac_email(send_smtp_email)
+            get_brevo_api().send_transac_email(send_smtp_email)
             print("Notificação de admin enviada para Kickstart.")
         except Exception as e:
             print(f"Aviso: Não foi possível enviar notificação admin: {e}")
@@ -206,7 +210,7 @@ def request_consultation():
 
         try:
             print("Tentando enviar email via API Brevo...")
-            api_response = api_instance.send_transac_email(send_smtp_email)
+            api_response = get_brevo_api().send_transac_email(send_smtp_email)
             print(f"Email de pedido de consultoria enviado via Brevo. Resposta: {api_response}")
             return jsonify({"message": "Pedido de consultoria recebido com sucesso! Entraremos em contacto brevemente."}), 200
         except ApiException as e:
@@ -284,7 +288,7 @@ def request_content():
 
         try:
             print("Tentando enviar email via API Brevo...")
-            api_response = api_instance.send_transac_email(send_smtp_email)
+            api_response = get_brevo_api().send_transac_email(send_smtp_email)
             print(f"Email de pedido de criação de conteúdo enviado via Brevo. Resposta: {api_response}")
             return jsonify({"message": "Pedido de criação de conteúdo recebido com sucesso! Entraremos em contacto brevemente."}), 200
         except ApiException as e:

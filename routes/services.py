@@ -12,13 +12,18 @@ from utils.secrets import get_secret
 
 services_bp = Blueprint("services", __name__)
 
-# Configuração da API Brevo (Sendinblue)
-configuration = sib_api_v3_sdk.Configuration()
-# Tentar obter do Secret Manager (ou env var)
-api_key = get_secret("BREVO_API_KEY")
-configuration.api_key["api-key"] = api_key
+# Lazy initialization for Brevo API
+_api_instance = None
 
-api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
+def get_brevo_api():
+    """Lazily initialize the Brevo API client to ensure fresh secret access."""
+    global _api_instance
+    if _api_instance is None:
+        configuration = sib_api_v3_sdk.Configuration()
+        api_key = get_secret("BREVO_API_KEY")
+        configuration.api_key["api-key"] = api_key
+        _api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
+    return _api_instance
 
 @services_bp.route("/cv-review", methods=["POST"])
 def request_cv_review():
@@ -152,7 +157,7 @@ def request_cv_review():
         )
 
         try:
-            api_instance.send_transac_email(send_smtp_email)
+            get_brevo_api().send_transac_email(send_smtp_email)
             print("Email enviado com sucesso.")
             
             # Sucesso total
@@ -241,7 +246,7 @@ def send_kickstart_email():
             )
         
         try:
-            api_instance.send_transac_email(send_smtp_email)
+            get_brevo_api().send_transac_email(send_smtp_email)
             return jsonify({"success": True, "message": "Email enviado com sucesso"})
         except ApiException as e:
             print(f"Erro Brevo: {e}")

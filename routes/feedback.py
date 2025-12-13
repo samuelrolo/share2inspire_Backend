@@ -19,17 +19,6 @@ load_dotenv()
 
 feedback_bp = Blueprint("feedback", __name__)
 
-# Configuração da API Brevo (Sendinblue)
-configuration = sib_api_v3_sdk.Configuration()
-api_key = get_secret("BREVO_API_KEY")
-configuration.api_key["api-key"] = api_key
-
-# Verificar se a chave API foi carregada
-if not api_key:
-    logger.error("ALERTA: A variável de ambiente BREVO_API_KEY não está definida!")
-else:
-    logger.info("Chave API Brevo configurada com sucesso")
-
 # Email do remetente verificado na Brevo - E-MAIL CORRIGIDO
 VERIFIED_SENDER_EMAIL = os.getenv("BREVO_SENDER_EMAIL", "srshare2inspire@gmail.com")
 VERIFIED_SENDER_NAME = os.getenv("BREVO_SENDER_NAME", "Share2Inspire")
@@ -38,7 +27,22 @@ VERIFIED_SENDER_NAME = os.getenv("BREVO_SENDER_NAME", "Share2Inspire")
 ADMIN_EMAIL = "srshare2inspire@gmail.com"
 ADMIN_NAME = "Share2Inspire Admin"
 
-api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
+# Lazy initialization for Brevo API
+_api_instance = None
+
+def get_brevo_api():
+    """Lazily initialize the Brevo API client to ensure fresh secret access."""
+    global _api_instance
+    if _api_instance is None:
+        configuration = sib_api_v3_sdk.Configuration()
+        api_key = get_secret("BREVO_API_KEY")
+        if not api_key:
+            logger.error("ALERTA: BREVO_API_KEY não está definida!")
+        else:
+            logger.info(f"Chave API Brevo configurada: {api_key[:10]}...")
+        configuration.api_key["api-key"] = api_key
+        _api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
+    return _api_instance
 
 # NOVA ROTA: Endpoint para contacto geral
 @feedback_bp.route("/contact", methods=["POST", "OPTIONS"])
@@ -122,7 +126,7 @@ def submit_contact():
         
         # Enviar o email
         logger.info("A enviar email de contacto via Brevo API")
-        api_response = api_instance.send_transac_email(send_smtp_email)
+        api_response = get_brevo_api().send_transac_email(send_smtp_email)
         logger.info(f"Email enviado com sucesso. ID da mensagem: {api_response.message_id}")
         
         return jsonify({
@@ -244,7 +248,7 @@ def submit_feedback():
         
         # Enviar o email
         logger.info("A enviar email de feedback via Brevo API")
-        api_response = api_instance.send_transac_email(send_smtp_email)
+        api_response = get_brevo_api().send_transac_email(send_smtp_email)
         logger.info(f"Email enviado com sucesso. ID da mensagem: {api_response.message_id}")
         
         return jsonify({
@@ -351,7 +355,7 @@ def submit_newsletter():
         
         # Enviar o email para o administrador
         logger.info("A enviar notificação de newsletter via Brevo API")
-        api_response = api_instance.send_transac_email(admin_email)
+        api_response = get_brevo_api().send_transac_email(admin_email)
         logger.info(f"Email enviado com sucesso. ID da mensagem: {api_response.message_id}")
         
         # Construir o email de confirmação para o utilizador
@@ -392,7 +396,7 @@ def submit_newsletter():
         
         # Enviar o email para o utilizador
         logger.info("A enviar confirmação de newsletter para o utilizador via Brevo API")
-        user_response = api_instance.send_transac_email(user_confirmation)
+        user_response = get_brevo_api().send_transac_email(user_confirmation)
         logger.info(f"Email de confirmação enviado com sucesso. ID da mensagem: {user_response.message_id}")
         
         return jsonify({
