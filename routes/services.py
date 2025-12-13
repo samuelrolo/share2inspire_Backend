@@ -191,30 +191,50 @@ def send_kickstart_email():
         if not email or not name:
             return jsonify({"success": False, "error": "Email e Nome obrigatórios"}), 400
             
-        # Construir o email
-        subject = "Confirmação - Kickstart Pro Share2Inspire"
-        html_content = f"""
-        <html><body>
-            <h2>Obrigado pelo seu interesse no Kickstart Pro!</h2>
-            <p>Olá {name},</p>
-            <p>Recebemos a sua marcação para o Kickstart Pro. Entraremos em contacto brevemente.</p>
-            <p><strong>Detalhes:</strong></p>
-            <ul>
-                <li>Nome: {name}</li>
-                <li>Email: {email}</li>
-                <li>Data: {data.get('date', 'A definir')}</li>
-                <li>Duração: {data.get('duration', '30 minutos')}</li>
-            </ul>
-            <p>Cumprimentos,<br>Equipa Share2Inspire</p>
-        </body></html>
-        """
+        # Verificar se é para usar template (frontend envia templateId)
+        template_id = data.get('templateId')
+        params = data.get('params')
+
+        recipients = [{"email": email, "name": name}]
+        admin_email = {"email": "srshare2inspire@gmail.com", "name": "Admin Share2Inspire"}
         
-        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-            to=[{"email": email, "name": name}],
-            sender={"email": os.getenv("BREVO_SENDER_EMAIL", "noreply@share2inspire.pt"), "name": "Share2Inspire"},
-            subject=subject,
-            html_content=html_content
-        )
+        # Enviar também para admin (como BCC ou TO adicional)
+        # Brevo API permite array em 'to' ou 'bcc'
+        
+        if template_id:
+            # Usar Template do Brevo
+            send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+                to=recipients,
+                bcc=[admin_email],
+                template_id=int(template_id),
+                params=params
+            )
+        else:
+            # Fallback Manual
+            subject = "Confirmação - Kickstart Pro Share2Inspire"
+            html_content = f"""
+            <html><body>
+                <h2>Obrigado pelo seu interesse no Kickstart Pro!</h2>
+                <p>Olá {name},</p>
+                <p>Recebemos a sua marcação para o Kickstart Pro. Entraremos em contacto brevemente.</p>
+                <p><strong>Detalhes:</strong></p>
+                <ul>
+                    <li>Nome: {name}</li>
+                    <li>Email: {email}</li>
+                    <li>Data: {data.get('date', 'A definir')}</li>
+                    <li>Duração: {data.get('duration', '30 minutos')}</li>
+                </ul>
+                <p>Cumprimentos,<br>Equipa Share2Inspire</p>
+            </body></html>
+            """
+            
+            send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+                to=recipients,
+                bcc=[admin_email],
+                sender={"email": os.getenv("BREVO_SENDER_EMAIL", "noreply@share2inspire.pt"), "name": "Share2Inspire"},
+                subject=subject,
+                html_content=html_content
+            )
         
         try:
             api_instance.send_transac_email(send_smtp_email)
