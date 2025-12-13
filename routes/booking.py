@@ -8,11 +8,13 @@ from dotenv import load_dotenv
 # Carregar variáveis de ambiente
 load_dotenv()
 
+from utils.secrets import get_secret
+
 booking_bp = Blueprint("booking", __name__)
 
 # Configuração da API Brevo (Sendinblue)
 configuration = sib_api_v3_sdk.Configuration()
-api_key = os.getenv("BREVO_API_KEY")
+api_key = get_secret("BREVO_API_KEY")
 configuration.api_key["api-key"] = api_key
 
 # Verificar se a chave API foi carregada

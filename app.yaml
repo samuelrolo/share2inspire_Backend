@@ -8,6 +8,7 @@ env_variables:
   FLASK_APP: main.py
   FLASK_ENV: production
   FLASK_DEBUG: "False"
+  GOOGLE_CLOUD_PROJECT: "share2inspire-beckend"
   
   # Configurações de email (Brevo)
   # BREVO_API_KEY removido para usar Secret Manager
