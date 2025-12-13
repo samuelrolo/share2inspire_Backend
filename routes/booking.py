@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 # Carregar variáveis de ambiente
 load_dotenv()
 
-booking_bp = Blueprint("booking", __name__, url_prefix="/api/booking")
+booking_bp = Blueprint("booking", __name__)
 
 # Configuração da API Brevo (Sendinblue)
 configuration = sib_api_v3_sdk.Configuration()
@@ -103,6 +103,53 @@ def schedule_appointment():
     except Exception as e:
         print(f"Erro global no endpoint /schedule: {e}")
         return jsonify({"error": "Ocorreu um erro no servidor.", "details": str(e)}), 500
+
+@booking_bp.route("/kickstart", methods=["POST"])
+def book_kickstart():
+    try:
+        print("Endpoint /api/booking/kickstart chamado com método POST")
+        data = request.get_json()
+        print(f"Dados recebidos: {json.dumps(data, indent=2)}")
+        
+        if not data:
+            return jsonify({"error": "Nenhum dado recebido"}), 400
+
+        # Extrair dados do pedido
+        name = data.get("name")
+        email = data.get("email")
+        # Kickstart específico
+        date = data.get("date", "A definir")
+        
+        # Enviar notificação ADMIN apenas (o user recebe confirmação após pagamento)
+        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+            to=[{"email": "srshare2inspire@gmail.com", "name": "Share2Inspire Admin"}],
+            sender={"email": os.getenv("BREVO_SENDER_EMAIL", "noreply@share2inspire.pt"), "name": "Sistema de Reservas"},
+            subject=f"Novo Pedido Kickstart Pro (Pendente Pagamento) - {name}",
+            html_content=f"""
+            <html><body>
+                <h2>Novo Início de Reserva Kickstart Pro</h2>
+                <p>O utilizador iniciou o processo de reserva.</p>
+                <p><strong>Nome:</strong> {name}</p>
+                <p><strong>Email:</strong> {email}</p>
+                <p><strong>Data Indicativa:</strong> {date}</p>
+                <p><em>Aguardar confirmação de pagamento.</em></p>
+            </body></html>
+            """
+        )
+        
+        try:
+            api_instance.send_transac_email(send_smtp_email)
+            print("Notificação de admin enviada para Kickstart.")
+        except Exception as e:
+            print(f"Aviso: Não foi possível enviar notificação admin: {e}")
+
+        # Retornar sucesso para o frontend prosseguir para pagamento
+        return jsonify({"message": "Pré-reserva registada. Prossiga para pagamento."}), 200
+
+    except Exception as e:
+        print(f"Erro no endpoint /kickstart: {e}")
+        # Retornar sucesso mesmo com erro para não bloquear pagamento
+        return jsonify({"message": "Erro processado, prosseguindo."}), 200
 
 @booking_bp.route("/consultation", methods=["POST"])
 def request_consultation():

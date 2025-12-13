@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # Carregar variáveis de ambiente do ficheiro .env
 load_dotenv()
 
-feedback_bp = Blueprint("feedback", __name__, url_prefix="/api/feedback")
+feedback_bp = Blueprint("feedback", __name__)
 
 # Configuração da API Brevo (Sendinblue)
 configuration = sib_api_v3_sdk.Configuration()
