@@ -188,6 +188,10 @@ def send_kickstart_email():
         email = data.get('email')
         name = data.get('name')
         
+        # Log da forma de pagamento, se recebida
+        payment_method = data.get('payment_method')
+        logger.info(f"Pagamento via: {payment_method if payment_method else 'Não especificado'}")
+
         if not email or not name:
             return jsonify({"success": False, "error": "Email e Nome obrigatórios"}), 400
             
