@@ -31,18 +31,15 @@ ADMIN_NAME = "Share2Inspire Admin"
 _api_instance = None
 
 def get_brevo_api():
-    """Lazily initialize the Brevo API client to ensure fresh secret access."""
-    global _api_instance
-    if _api_instance is None:
-        configuration = sib_api_v3_sdk.Configuration()
-        api_key = get_secret("BREVO_API_KEY")
-        if not api_key:
-            logger.error("ALERTA: BREVO_API_KEY não está definida!")
-        else:
-            logger.info(f"Chave API Brevo configurada: {api_key[:10]}...")
-        configuration.api_key["api-key"] = api_key
-        _api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
-    return _api_instance
+    """Initialize the Brevo API client. Creates fresh instance each time to ensure correct key."""
+    configuration = sib_api_v3_sdk.Configuration()
+    api_key = get_secret("BREVO_API_KEY")
+    if not api_key:
+        logger.error("ALERTA: BREVO_API_KEY não está definida!")
+    else:
+        logger.info(f"Chave API Brevo configurada: {api_key[:10]}...")
+    configuration.api_key["api-key"] = api_key
+    return sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
 
 # NOVA ROTA: Endpoint para contacto geral
 @feedback_bp.route("/contact", methods=["POST", "OPTIONS"])

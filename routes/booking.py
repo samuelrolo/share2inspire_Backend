@@ -16,18 +16,15 @@ booking_bp = Blueprint("booking", __name__)
 _api_instance = None
 
 def get_brevo_api():
-    """Lazily initialize the Brevo API client to ensure fresh secret access."""
-    global _api_instance
-    if _api_instance is None:
-        configuration = sib_api_v3_sdk.Configuration()
-        api_key = get_secret("BREVO_API_KEY")
-        if not api_key:
-            print("ALERTA: BREVO_API_KEY não está definida!")
-        else:
-            print(f"BREVO_API_KEY carregada: {api_key[:10]}...")
-        configuration.api_key["api-key"] = api_key
-        _api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
-    return _api_instance
+    """Initialize the Brevo API client. Creates fresh instance each time."""
+    configuration = sib_api_v3_sdk.Configuration()
+    api_key = get_secret("BREVO_API_KEY")
+    if not api_key:
+        print("ALERTA: BREVO_API_KEY não está definida!")
+    else:
+        print(f"BREVO_API_KEY carregada: {api_key[:10]}...")
+    configuration.api_key["api-key"] = api_key
+    return sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
 
 @booking_bp.route("/schedule", methods=["POST"])
 def schedule_appointment():
