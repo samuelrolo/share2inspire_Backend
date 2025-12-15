@@ -13,7 +13,7 @@ class CVAnalyzer:
         if self.api_key:
             genai.configure(api_key=self.api_key)
             # Use a model that supports JSON mode well, e.g., gemini-1.5-flash or pro
-            self.model = genai.GenerativeModel('gemini-1.5-flash-latest')
+            self.model = genai.GenerativeModel('gemini-1.5-flash-001')
         else:
             self.model = None
 
