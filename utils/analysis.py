@@ -43,125 +43,139 @@ class CVAnalyzer:
             return ""
         return text
 
-    def analyze(self, file_stream, filename, role, experience_level):
-        """Main analysis method. Tries Gemini first, falls back to heuristics."""
-        text = self.extract_text(file_stream, filename)
-        if not text:
-            return {"error": "Could not extract text from file"}
-            
-        clean_text = text[:10000] # Limit context window just in case
-        
-        # 1. Try AI Analysis
-        if self.model:
-            try:
-                print("Iniciando análise com Gemini AI...")
-                return self._analyze_with_ai(clean_text, role, experience_level)
-            except Exception as e:
-                print(f"Erro na análise AI: {e}. Falling back to heuristics.")
-        
-        # 2. Fallback to Heuristics
-        result = self._analyze_heuristics(clean_text, role, experience_level)
-        result["analysis_type"] = "heuristic"
-        result["ai_error"] = "Gemini Model not initialized (Check API Key)" if not self.model else "AI generation failed"
-        return result
-
-    def _analyze_with_ai(self, text, role, experience):
-        # Definição do Prompt Complexo com Persona e Estrutura JSON
-        prompt = f"""
-        Act as a Senior Recruitment Specialist, Career Consultant, and ATS Expert with specific experience in strategic consulting, technology, and organizational transformation in international markets.
-        
-        OBJECTIVE:
-        Analyze the following CV content for a professional targeting the role/sector of '{role}' with '{experience}' of experience.
-        Produce a professional, in-depth, result-oriented assessment suitable for mid-to-high seniority profiles.
-        
-        INPUT CONTEXT:
-        CV Text: {text[:15000]} (truncated if too long)
-        Target Role: {role}
-        Experience Level: {experience}
-        
-        OUTPUT LANGUAGE: Portuguese (Portugal) - Professional, clear, non-generic.
-        
-        MANDATORY OUTPUT STRUCTURE (JSON ONLY):
-        You must output ONLY a valid JSON object with the following schema. Do not include markdown code blocks like ```json.
-        
-        {{
-            "executive_summary": {{
-                "vision": "Resumo curto e objetivo do posicionamento do candidato no mercado (2-3 frases).",
-                "market_fit_percentage": <int 0-100>,
-                "strategic_read": "Leitura estratégica do perfil, senioridade percebida e coerência global."
-            }},
-            "ats_compatibility": {{
-                "score": <int 0-100>,
-                "explanation": "Explicação clara dos fatores que aumentam ou reduzem a pontuação.",
-                "risk_analysis": "Risco estimado de exclusão automática (Baixo/Médio/Alto) e porquê."
-            }},
-            "structural_analysis": {{
-                "clarity_score": <int 0-100>,
-                "organization_feedback": "Avaliação da organização das secções.",
-                "legibility_feedback": "Legibilidade técnica para humanos e ATS."
-            }},
-            "content_impact": {{
-                "title_strength": "Avaliação da força dos títulos.",
-                "metrics_presence": "Avaliação sobre a presença de métricas/resultados (Fraca/Moderada/Forte).",
-                "verb_power": "Uso de verbos de ação adequados à senioridade.",
-                "alignment_feedback": "Alinhamento entre experiência e setor alvo."
-            }},
-            "keywords": {{
-                "missing": ["palavra1", "palavra2", "palavra3", "palavra4", "palavra5"],
-                "suggested_alternatives": ["termo1", "termo2"],
-                "language_balance_feedback": "Equilíbrio entre linguagem humana e algorítmica."
-            }},
-            "strengths": [
-                "Ponto forte diferenciador 1",
-                "Ponto forte diferenciador 2",
-                "Ponto forte diferenciador 3"
-            ],
-            "improvements": [
-                {{
-                    "area": "Área de melhoria (ex: Resumo, Experiência)",
-                    "impact": "Crítico" | "Alto" | "Médio",
-                    "description": "Explicação do problema."
-                }},
-                {{ "area": "...", "impact": "...", "description": "..." }},
-                {{ "area": "...", "impact": "...", "description": "..." }}
-            ],
-            "recommendations": [
-                {{
-                    "section_target": "Secção alvo (ex: Experiência Profissional)",
-                    "actionable_tip": "Sugestão concreta do que fazer.",
-                    "example": "Exemplo de frase ou formatação melhorada."
-                }},
-                {{ "section_target": "...", "actionable_tip": "...", "example": "..." }}
-            ],
-            "strategic_tips": [
-                "Dica estratégica 1 (não genérica)",
-                "Dica estratégica 2",
-                "Dica estratégica 3"
-            ],
-            "final_assessment": {{
-                "score": <int 0-100> (Readiness Index),
-                "readiness_level": "Base sólida" | "Competitivo" | "Alto potencial" | "Pronto para mercado"
-            }}
-        }}
+    def analyze(self, file_storage, filename, role=None, experience_level=None):
         """
-        
+        Main analysis method using Gemini Native PDF Parsing (Multimodal).
+        """
+        if not self.model:
+            return {
+                "error": "Gemini Model not initialized. Check API Key.",
+                "analysis_type": "error"
+            }
+
         try:
-            response = self.model.generate_content(prompt)
-            content = response.text
+            # Prepare the file for inline data (Pass text or bits based on type)
+            mime_type = "application/pdf" if filename.lower().endswith(".pdf") else "text/plain"
             
-            # Limpeza robusta do JSON
-            content = content.strip()
-            if content.startswith("```json"):
-                content = content[7:]
-            if content.startswith("```"):
-                content = content[3:]
-            if content.endswith("```"):
-                content = content[:-3]
-                
-            return json.loads(content.strip())
+            # Read file bytes
+            file_storage.seek(0)
+            file_bytes = file_storage.read()
+            
+            # Context info for the prompt
+            role_context = f"Target Role: {role}" if role else "Target Role: Auto-detect from CV"
+            exp_context = f"Experience Level: {experience_level}" if experience_level else "Experience Level: Auto-detect"
+            
+            print(f"Iniciando análise AI Nativa ({mime_type}) para {filename}...")
+
+            # Define the Senior Persona Prompt
+            prompt = f"""
+            You are Marlene Ruivo, a Senior Strategic Recruitment Consultant and Career Coach with 20+ years of experience in Executive Search and Talent Development in Portugal.
+            
+            YOUR PERSONA:
+            - Strategic, direct, and result-oriented.
+            - You value measurable impact (ROI), clear structure, and "Seniority signals".
+            - You speak professional "European Portuguese" (Portugal).
+            
+            OBJECTIVE:
+            Perform a deep-dive analysis of the attached CV/Resume.
+            1.  First, AUTO-DETECT the candidate's most likely Target Role and Seniority Level based on the content.
+            2.  Then, evaluate the CV against that detected standard, or the following user input if provided:
+                {role_context}
+                {exp_context}
+            
+            OUTPUT REQUIREMENTS:
+            - Language: Strict European Portuguese (PT-PT).
+            - Format: JSON ONLY. No markdown fencing.
+            
+            MANDATORY JSON STRUCTURE:
+            {{
+                "candidate_profile": {{
+                    "detected_name": "Name or 'Candidato'",
+                    "detected_role": "Current/Target Role",
+                    "detected_years_exp": "Calculated Total Years (e.g. '8 anos')",
+                    "seniority_level": "Júnior | Pleno | Sénior | Executivo"
+                }},
+                "executive_summary": {{
+                    "vision": "A brief, high-impact paragraph (3-4 sentences) summarizing the candidate's value proposition. Focus on their 'Why'.",
+                    "market_fit_score": <int 0-100>,
+                    "strategic_feedback": "One strategic observation about their positioning."
+                }},
+                "ats_compatibility": {{
+                    "score": <int 0-100>,
+                    "risk_factors": ["List of potential parsing issues found (e.g. headers, columns, icons)"],
+                    "advice": "One quick tip to improve parsing."
+                }},
+                "content_analysis": {{
+                    "impact_score": <int 0-100>,
+                    "verb_power": "Weak | Good | Strong",
+                    "metrics_usage": "None | Sparse | Healthy",
+                    "critique": "Specific feedback on how they describe their achievements (e.g. 'Too task-oriented, needs more results')."
+                }},
+                "structure_design": {{
+                    "score": <int 0-100>,
+                    "feedback": "Feedback on layout, length, and readability."
+                }},
+                "key_strengths": [
+                    "Strength 1 (Strategic/Hard Skill)",
+                    "Strength 2",
+                    "Strength 3"
+                ],
+                "improvement_areas": [
+                    {{
+                        "area": "Section or Aspect (e.g. 'Professional Summary')",
+                        "severity": "Critical | High | Medium",
+                        "suggestion": "Specific actionable advice on how to fix it."
+                    }},
+                    {{ "area": "...", "severity": "...", "suggestion": "..." }}
+                ],
+                "skills_cloud": ["Skill 1", "Skill 2", "Skill 3", "Skill 4", "Skill 5", "Skill 6", "Skill 7", "Skill 8"],
+                "final_verdict": {{
+                    "readiness_score": <int 0-100>,
+                    "badge": "Needs Work | Solid Base | Market Ready | Top Talent",
+                    "closing_comment": "Short motivating closing sentence."
+                }}
+            }}
+            """
+
+            # Payload for Gemini
+            content_parts = [
+                prompt,
+                {
+                    "mime_type": mime_type,
+                    "data": file_bytes
+                }
+            ]
+
+            # Generate
+            response = self.model.generate_content(content_parts)
+            
+            if not response.text:
+                raise ValueError("Empty response from AI")
+
+            # Clean JSON
+            json_str = response.text.strip()
+            if json_str.startswith("```json"):
+                json_str = json_str[7:]
+            if json_str.startswith("```"):
+                json_str = json_str[3:]
+            if json_str.endswith("```"):
+                json_str = json_str[:-3]
+            
+            return json.loads(json_str.strip())
+
         except Exception as e:
-            print(f"Error parsing AI response: {e}")
-            return self._analyze_heuristics(text, role, experience) # Fallback seguro
+            print(f"AI Analysis Failed: {e}")
+            # Fallback to Text Extraction + Heuristics if Native fails
+            # (Re-read file logic required or re-use bytes)
+            try:
+                # Reset stream for fallback text extraction
+                file_storage.seek(0)
+                text = self.extract_text(file_storage, filename)
+                fallback_result = self._analyze_heuristics(text, role, experience_level)
+                fallback_result["ai_error"] = str(e)
+                return fallback_result
+            except Exception as fallback_err:
+                 return {"error": f"Critical Analysis Error: {str(e)} -> {str(fallback_err)}"}
 
     def _analyze_heuristics(self, text, role, experience_level):
         """Fallback estruturado para quando a AI falha ou não está configurada."""
