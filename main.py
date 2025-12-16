@@ -49,6 +49,29 @@ def health_check():
         "timestamp": datetime.now().isoformat()
     })
 
+@app.route('/api/debug/models', methods=['GET'])
+def list_models():
+    try:
+        from utils.secrets import get_secret
+        import google.generativeai as genai
+        
+        api_key = get_secret('GEMINI_API_KEY')
+        if not api_key:
+            return jsonify({'error': 'No API Key'}), 500
+            
+        genai.configure(api_key=api_key)
+        
+        models = []
+        for m in genai.list_models():
+            models.append({
+                'name': m.name,
+                'supported_generation_methods': m.supported_generation_methods
+            })
+            
+        return jsonify({'models': models})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/health')
 def api_health():
     return jsonify({

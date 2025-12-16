@@ -13,7 +13,7 @@ class CVAnalyzer:
         if self.api_key:
             genai.configure(api_key=self.api_key)
             # Use a model that supports JSON mode well, e.g., gemini-1.5-flash or pro
-            self.model = genai.GenerativeModel('gemini-1.5-flash-001')
+            self.model = genai.GenerativeModel('gemini-flash-latest')
         else:
             self.model = None
 
@@ -45,130 +45,95 @@ class CVAnalyzer:
 
     def analyze(self, file_storage, filename, role=None, experience_level=None):
         """
-        Main analysis method using Gemini Native PDF Parsing (Multimodal).
+        Main analysis method using Gemini File API for robust PDF handling.
         """
         if not self.model:
-            return {
-                "error": "Gemini Model not initialized. Check API Key.",
-                "analysis_type": "error"
-            }
+            # Try to re-init model with standard 1.5 flash name if not set
+            if self.api_key:
+                 self.model = genai.GenerativeModel('gemini-1.5-flash')
+            else:
+                return {
+                    "error": "Gemini Model not initialized. Check API Key.",
+                    "analysis_type": "error"
+                }
 
+        uploaded_file = None
         try:
-            # Prepare the file for inline data (Pass text or bits based on type)
-            mime_type = "application/pdf" if filename.lower().endswith(".pdf") else "text/plain"
+            print(f"Iniciando análise AI via File API para {filename}...")
             
-            # Read file bytes
-            file_storage.seek(0)
-            file_bytes = file_storage.read()
+            # Save file temporarily to upload (File API requires path or file-like with name often)
+            # We will use a temp file for safety
+            import tempfile
             
-            # Context info for the prompt
+            suffix = ".pdf" if filename.lower().endswith(".pdf") else ".txt"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                file_storage.seek(0)
+                tmp.write(file_storage.read())
+                tmp_path = tmp.name
+
+            # Upload to Gemini
+            uploaded_file = genai.upload_file(tmp_path, mime_type="application/pdf" if suffix == ".pdf" else "text/plain")
+            
+            # Wait for file processing if needed (small PDFs are usually instant, but good practice)
+            # Active wait loop could be added here if files are large, but for CVs usually fine.
+            
+            # Context info
             role_context = f"Target Role: {role}" if role else "Target Role: Auto-detect from CV"
             exp_context = f"Experience Level: {experience_level}" if experience_level else "Experience Level: Auto-detect"
             
-            print(f"Iniciando análise AI Nativa ({mime_type}) para {filename}...")
-
-            # Define the Senior Persona Prompt
+            # Prompt (Reduced for brevity but kept core instructions)
             prompt = f"""
-            You are Marlene Ruivo, a Senior Strategic Recruitment Consultant and Career Coach with 20+ years of experience in Executive Search and Talent Development in Portugal.
-            
-            YOUR PERSONA:
-            - Strategic, direct, and result-oriented.
-            - You value measurable impact (ROI), clear structure, and "Seniority signals".
-            - You speak professional "European Portuguese" (Portugal).
+            You are Marlene Ruivo, a Senior Strategic Recruitment Consultant.
+            Analyze this CV.
             
             OBJECTIVE:
-            Perform a deep-dive analysis of the attached CV/Resume.
-            1.  First, AUTO-DETECT the candidate's most likely Target Role and Seniority Level based on the content.
-            2.  Then, evaluate the CV against that detected standard, or the following user input if provided:
-                {role_context}
-                {exp_context}
+            1. Auto-detect Target Role and Seniority.
+            2. Evaluate against detected standard or: {role_context}, {exp_context}.
             
-            OUTPUT REQUIREMENTS:
-            - Language: Strict European Portuguese (PT-PT).
-            - Format: JSON ONLY. No markdown fencing.
-            
-            MANDATORY JSON STRUCTURE:
+            OUTPUT: JSON ONLY (No markdown). Strict Portuguese (PT-PT).
+            Structure:
             {{
                 "candidate_profile": {{
-                    "detected_name": "Name or 'Candidato'",
-                    "detected_role": "Current/Target Role",
-                    "detected_years_exp": "Calculated Total Years (e.g. '8 anos')",
-                    "seniority_level": "Júnior | Pleno | Sénior | Executivo"
+                    "detected_name": "Name", "detected_role": "Role", "detected_years_exp": "Years", "seniority_level": "Level"
                 }},
-                "executive_summary": {{
-                    "vision": "A brief, high-impact paragraph (3-4 sentences) summarizing the candidate's value proposition. Focus on their 'Why'.",
-                    "market_fit_score": <int 0-100>,
-                    "strategic_feedback": "One strategic observation about their positioning."
-                }},
-                "ats_compatibility": {{
-                    "score": <int 0-100>,
-                    "risk_factors": ["List of potential parsing issues found (e.g. headers, columns, icons)"],
-                    "advice": "One quick tip to improve parsing."
-                }},
-                "content_analysis": {{
-                    "impact_score": <int 0-100>,
-                    "verb_power": "Weak | Good | Strong",
-                    "metrics_usage": "None | Sparse | Healthy",
-                    "critique": "Specific feedback on how they describe their achievements (e.g. 'Too task-oriented, needs more results')."
-                }},
-                "structure_design": {{
-                    "score": <int 0-100>,
-                    "feedback": "Feedback on layout, length, and readability."
-                }},
-                "key_strengths": [
-                    "Strength 1 (Strategic/Hard Skill)",
-                    "Strength 2",
-                    "Strength 3"
-                ],
-                "improvement_areas": [
-                    {{
-                        "area": "Section or Aspect (e.g. 'Professional Summary')",
-                        "severity": "Critical | High | Medium",
-                        "suggestion": "Specific actionable advice on how to fix it."
-                    }},
-                    {{ "area": "...", "severity": "...", "suggestion": "..." }}
-                ],
-                "skills_cloud": ["Skill 1", "Skill 2", "Skill 3", "Skill 4", "Skill 5", "Skill 6", "Skill 7", "Skill 8"],
-                "final_verdict": {{
-                    "readiness_score": <int 0-100>,
-                    "badge": "Needs Work | Solid Base | Market Ready | Top Talent",
-                    "closing_comment": "Short motivating closing sentence."
-                }}
+                "executive_summary": {{ "vision": "Summary", "market_fit_score": 0-100, "strategic_feedback": "Feedback" }},
+                "ats_compatibility": {{ "score": 0-100, "risk_factors": [], "advice": "" }},
+                "content_analysis": {{ "impact_score": 0-100, "verb_power": "", "metrics_usage": "", "critique": "" }},
+                "structure_design": {{ "score": 0-100, "feedback": "" }},
+                "key_strengths": ["Str1", "Str2"],
+                "improvement_areas": [ {{ "area": "", "severity": "", "suggestion": "" }} ],
+                "skills_cloud": ["Skill1", "Skill2"],
+                "final_verdict": {{ "readiness_score": 0-100, "badge": "", "closing_comment": "" }}
             }}
             """
 
-            # Payload for Gemini
-            content_parts = [
-                prompt,
-                {
-                    "mime_type": mime_type,
-                    "data": file_bytes
-                }
-            ]
-
-            # Generate
-            response = self.model.generate_content(content_parts)
+            # Generate Content with File reference
+            response = self.model.generate_content([prompt, uploaded_file])
             
+            # Cleanup File from Gemini (Optional but good practice)
+            try:
+                uploaded_file.delete()
+            except:
+                pass
+                
+            # Cleanup Temp File
+            os.unlink(tmp_path)
+
             if not response.text:
                 raise ValueError("Empty response from AI")
 
             # Clean JSON
-            json_str = response.text.strip()
-            if json_str.startswith("```json"):
-                json_str = json_str[7:]
-            if json_str.startswith("```"):
-                json_str = json_str[3:]
-            if json_str.endswith("```"):
-                json_str = json_str[:-3]
-            
-            return json.loads(json_str.strip())
+            json_str = response.text.replace('```json', '').replace('```', '').strip()
+            return json.loads(json_str)
 
         except Exception as e:
             print(f"AI Analysis Failed: {e}")
-            # Fallback to Text Extraction + Heuristics if Native fails
-            # (Re-read file logic required or re-use bytes)
+            if uploaded_file:
+                try: uploaded_file.delete()
+                except: pass
+                
+            # Fallback
             try:
-                # Reset stream for fallback text extraction
                 file_storage.seek(0)
                 text = self.extract_text(file_storage, filename)
                 fallback_result = self._analyze_heuristics(text, role, experience_level)

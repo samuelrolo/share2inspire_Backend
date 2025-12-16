@@ -11,7 +11,7 @@ env_variables:
   GOOGLE_CLOUD_PROJECT: "share2inspire-beckend"
   
   # Gemini AI API Key
-  GEMINI_API_KEY: "AIzaSyARqwQ8vIH8bha6hlZSpU1frY7IAR1oZhI"
+  GEMINI_API_KEY: "AIzaSyAKYVsZ5W-DAnZUK5sH-jwJ8AIXFF0PTL0"
   
   # Configurações de email (Brevo)
   # BREVO_API_KEY removido para usar Secret Manager
