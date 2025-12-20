@@ -10,8 +10,7 @@ env_variables:
   FLASK_DEBUG: "False"
   GOOGLE_CLOUD_PROJECT: "share2inspire-beckend"
   
-  # Gemini AI API Key
-  GEMINI_API_KEY: "AIzaSyAKYVsZ5W-DAnZUK5sH-jwJ8AIXFF0PTL0"
+  # Gemini AI API Key - NOW IN SECRET MANAGER (DO NOT ADD HERE)
   
   # Configurações de email (Brevo)
   # BREVO_API_KEY removido para usar Secret Manager

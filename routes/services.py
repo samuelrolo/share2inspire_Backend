@@ -285,3 +285,106 @@ def analyze_cv():
     except Exception as e:
         print(f"Erro na análise de CV: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+@services_bp.route("/send-report-email", methods=["POST"])
+def send_report_email():
+    try:
+        data = request.get_json()
+        print(f"Dados recebidos para email de relatório: {data}")
+        
+        if not data:
+            return jsonify({"success": False, "error": "Dados não recebidos"}), 400
+            
+        email = data.get('email')
+        name = data.get('name')
+        report_data = data.get('reportData')
+        
+        if not email or not name or not report_data:
+            return jsonify({"success": False, "error": "Dados obrigatórios em falta (Email, Nome, Dados do Relatório)"}), 400
+
+        # E-mail Admin (rsshare2inspire@gmail.com conforme pedido do utilizador)
+        ADMIN_EMAIL = "rsshare2inspire@gmail.com"
+        
+        # Gerar o conteúdo HTML do relatório (simplificado para o corpo do email ou link)
+        # Por agora, vamos enviar os detalhes principais no corpo do email
+        profile = report_data.get('candidate_profile', {})
+        verdict = report_data.get('final_verdict', {})
+        summary = report_data.get('executive_summary', {})
+        
+        email_html = f"""
+        <html>
+        <body style="font-family: 'Poppins', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; padding: 20px;">
+            <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                <!-- Header -->
+                <div style="text-align: center; padding: 40px 20px; background-color: #ffffff;">
+                    <img src="https://share2inspire.pt/images/logo.png" alt="Share2Inspire" style="max-width: 200px; height: auto;">
+                    <h1 style="color: #BF9A33; font-size: 24px; margin-top: 25px; font-weight: 700; letter-spacing: 1px;">Relatório de Análise de CV</h1>
+                </div>
+                
+                <!-- Body -->
+                <div style="padding: 0 40px 40px 40px;">
+                    <p style="font-size: 16px;">Olá <strong>{name}</strong>,</p>
+                    
+                    <p style="font-size: 15px; color: #555;">Obrigado por confiares na Share2Inspire para analisar o teu percurso profissional.</p>
+                    
+                    <p style="font-size: 15px; color: #555;">Em anexo, encontras o Relatório Completo de Análise de CV em PDF, onde aprofundamos a leitura estratégica do teu perfil, indo além da síntese apresentada no ecrã. Este documento detalha posicionamento, maturidade profissional, potencial de mercado e recomendações concretas para evolução.</p>
+                    
+                    <p style="font-size: 15px; color: #555;">A análise confirma um perfil de elevada senioridade, com forte alinhamento a funções de liderança estratégica em Transformação Digital, RH e Futuro do Trabalho. Mais do que um CV sólido, estamos perante uma narrativa profissional com potencial de diferenciação clara no mercado global.</p>
+                    
+                    <div style="margin-top: 35px; border-top: 1px solid #eee; padding-top: 30px;">
+                        <h3 style="color: #1a1a1a; font-size: 18px; margin-bottom: 20px; border-left: 4px solid #BF9A33; padding-left: 15px;">Próximos passos recomendados</h3>
+                        
+                        <!-- Kickstart Pro -->
+                        <div style="margin-bottom: 30px;">
+                            <h4 style="color: #BF9A33; margin-bottom: 10px; font-size: 16px;">1. Sessão estratégica Kickstart Pro</h4>
+                            <p style="font-size: 14px; color: #666; margin-bottom: 15px;">Uma sessão individual de follow up, focada em transformar insights em decisões concretas. Trabalhamos posicionamento, foco estratégico e próximos movimentos de carreira, com abordagem prática e orientada a impacto.</p>
+                            <a href="https://share2inspire.pt/pages/servicos.html#kickstart" style="display: inline-block; background-color: #BF9A33; color: white; padding: 12px 25px; text-decoration: none; border-radius: 50px; font-weight: 600; font-size: 14px;">👉 Agendar Kickstart Pro</a>
+                        </div>
+                        
+                        <!-- Revisão Profissional -->
+                        <div>
+                            <h4 style="color: #BF9A33; margin-bottom: 10px; font-size: 16px;">2. Revisão Profissional de CV</h4>
+                            <p style="font-size: 14px; color: #666; margin-bottom: 15px;">Uma revisão aprofundada, humana e orientada a mercado, alinhando narrativa, estrutura e impacto do CV, tanto para leitura humana como para sistemas ATS.</p>
+                            <a href="https://share2inspire.pt/pages/servicos.html#cv-review" style="display: inline-block; background-color: #1a1a1a; color: white; padding: 12px 25px; text-decoration: none; border-radius: 50px; font-weight: 600; font-size: 14px;">👉 Solicitar Revisão Profissional de CV</a>
+                        </div>
+                    </div>
+                    
+                    <p style="font-size: 14px; color: #888; margin-top: 40px;">Se preferires, podes também continuar a explorar o CV Analyzer, utilizando-o como ferramenta de diagnóstico contínuo.</p>
+                    
+                    <p style="font-size: 15px; color: #555; margin-top: 30px;">Estamos disponíveis para apoiar o próximo capítulo do teu percurso com clareza, estratégia e intenção.</p>
+                </div>
+                
+                <!-- Footer -->
+                <div style="background-color: #1a1a1a; color: #ffffff; padding: 40px 20px; text-align: center; border-radius: 0 0 12px 12px;">
+                    <p style="font-size: 15px; font-weight: 600; margin-bottom: 5px;">Com estima,</p>
+                    <p style="font-size: 16px; font-weight: 700; color: #BF9A33; margin: 0;">Equipa Share2Inspire</p>
+                    <p style="font-size: 13px; opacity: 0.8; margin-top: 10px;">Human-Centred Career & Transformation Advisory</p>
+                    <p style="font-size: 13px; margin-top: 20px;"><a href="https://share2inspire.pt" style="color: #BF9A33; text-decoration: none;">www.share2inspire.pt</a></p>
+                    
+                    <div style="margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; font-size: 11px; opacity: 0.6;">
+                        <p>© 2025 Share2Inspire. Todos os direitos reservados.</p>
+                        <p>Este é um envio automático, por favor não responda a este email.</p>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+            to=[{"email": email, "name": name}],
+            bcc=[{"email": ADMIN_EMAIL, "name": "Admin Share2Inspire"}],
+            sender={"email": os.getenv("BREVO_SENDER_EMAIL", "srshare2inspire@gmail.com"), "name": "Share2Inspire Advisor"},
+            subject=f"O seu Relatório de Análise CV | Próximos Passos Estratégicos - {name}",
+            html_content=email_html
+        )
+        
+        try:
+            get_brevo_api().send_transac_email(send_smtp_email)
+            return jsonify({"success": True, "message": "Relatório enviado por email com sucesso!"})
+        except ApiException as e:
+            print(f"Erro Brevo: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
+            
+    except Exception as e:
+        print(f"Erro no endpoint send-report-email: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
