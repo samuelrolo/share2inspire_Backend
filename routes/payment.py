@@ -530,6 +530,20 @@ def process_payshop_payment():
         logger.error(f"Erro no endpoint Payshop: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+@payment_bp.route('/health', methods=['GET', 'OPTIONS'])
+def payment_health():
+    """Health check endpoint for payment service"""
+    if request.method == 'OPTIONS':
+        return handle_cors_preflight()
+    
+    return jsonify({
+        'service': 'payment',
+        'status': 'healthy',
+        'version': '2.0.0',
+        'timestamp': datetime.datetime.now().isoformat(),
+        'endpoints': ['mbway', 'multibanco', 'payshop', 'callback', 'status']
+    })
+
 # Log das configurações
 logger.info("=== SISTEMA DE PAGAMENTOS CORRIGIDO CARREGADO ===")
 logger.info(f"Multibanco URL: {IFTHENPAY_MULTIBANCO_URL}")
@@ -539,4 +553,5 @@ logger.info(f"MBWAY KEY: {'DEFINIDA' if IFTHENPAY_MBWAY_KEY else 'NÃO DEFINIDA'
 logger.info(f"MULTIBANCO KEY: {'DEFINIDA' if IFTHENPAY_MULTIBANCO_KEY else 'NÃO DEFINIDA'}")
 logger.info(f"PAYSHOP KEY: {'DEFINIDA' if IFTHENPAY_PAYSHOP_KEY else 'NÃO DEFINIDA'}")
 logger.info(f"BREVO API KEY: {'DEFINIDA' if BREVO_API_KEY else 'NÃO DEFINIDA'}")
+
 
