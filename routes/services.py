@@ -98,72 +98,23 @@ def request_cv_review():
             # Retornamos erro se pagamento falhar
             return jsonify({"success": False, "error": f"Erro ao iniciar pagamento MB WAY: {payment_result.get('error')}"}), 400
 
-        # >>> 2. Enviar Email com Anexo <<<
+        # >>> 2. Enviar Email 2 (Pedido e Link de Pagamento)
+        from utils.email import send_email_with_attachments, get_email_template_2
         
-        # Preparar anexo
-        attachment = None
-        cv_info = "Nenhum ficheiro enviado"
+        # O link de pagamento real viria do payment_result se existir na API
+        payment_link = payment_result.get('payment_url', "https://share2inspire.pt/pagamento")
+        html_content = get_email_template_2(name, payment_link)
         
-        if cv_file:
-            import base64
-            file_content = cv_file.read()
-            encoded_content = base64.b64encode(file_content).decode('utf-8')
-            attachment = [{
-                "content": encoded_content,
-                "name": cv_file.filename
-            }]
-            cv_info = f"Anexo: {cv_file.filename}"
-        elif cv_link:
-            cv_info = f"Link: <a href='{cv_link}'>{cv_link}</a>"
-
-        email_content = f"""
-            <html><body>
-                <h2>Novo Pedido: {service_name} (Pendente Pagamento)</h2>
-                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
-                    <p><strong>Status Pagamento:</strong> Iniciado (MB WAY {amount}€)</p>
-                    <p><strong>Referência Pedido:</strong> {payment_data['orderId']}</p>
-                    <p><strong>Serviço:</strong> {service_name}</p>
-                </div>
-                
-                <h3>Dados do Candidato</h3>
-                <ul>
-                    <li><strong>Nome:</strong> {name}</li>
-                    <li><strong>Email:</strong> {email}</li>
-                    <li><strong>Telefone:</strong> {phone}</li>
-                    <li><strong>LinkedIn:</strong> {linkedin_url}</li>
-                    <li><strong>Função Atual:</strong> {current_role}</li>
-                    <li><strong>Setor:</strong> {sector}</li>
-                    <li><strong>Experiência:</strong> {experience}</li>
-                </ul>
-
-                <h3>Contexto</h3>
-                {full_context}
-                
-                <hr>
-                <p><strong>CV:</strong> {cv_info}</p>
-            </body></html>
-            """
-
-        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-            to=[{"email": "srshare2inspire@gmail.com", "name": "Share2Inspire Admin"}],
-            sender={"email": os.getenv("BREVO_SENDER_EMAIL", "noreply@share2inspire.pt"), "name": "Sistema de Serviços"},
-            subject=f"{service_name} - {name} (Aguardar Pagamento)",
-            html_content=email_content,
-            reply_to={"email": email, "name": name},
-            attachment=attachment if attachment else None
+        success, msg = send_email_with_attachments(
+            email, name, "Confirmação do pedido | Pagamento Revisão Profissional de CV", html_content
         )
 
         try:
-            get_brevo_api().send_transac_email(send_smtp_email)
-            print("Email enviado com sucesso.")
-            
-            # Sucesso total
-            return jsonify({
-                "success": True, 
-                "message": "Isso", 
-                "payment": payment_result
-            }), 200
-            
+            get_brevo_api().send_transac_email(sib_api_v3_sdk.SendSmtpEmail(
+                to=[{"email": email, "name": name}],
+                subject="Confirmação do pedido | Pagamento Revisão Profissional de CV",
+                html_content=html_content
+            ))
         except ApiException as e:
             print(f"Erro Brevo: {e}")
             # Se o email falhar, mas o pagamento foi iniciado, avisamos o user
@@ -173,6 +124,12 @@ def request_cv_review():
                 "payment": payment_result,
                 "warning": str(e)
             }), 200
+
+        return jsonify({
+            "success": True, 
+            "message": "O teu pedido foi recebido. Assim que o pagamento for confirmado, receberás um email com os próximos passos.",
+            "payment": payment_result
+        }), 200
 
     except Exception as e:
         print(f"Erro global no endpoint /cv-review: {e}")
@@ -280,111 +237,90 @@ def analyze_cv():
         if "error" in report:
              return jsonify({"success": False, "error": report["error"]}), 400
 
+        # Enviar Lead para Admin (Opcional, mas recomendado para tracking)
+        # ... logic if needed ...
+
         return jsonify({"success": True, "report": report}), 200
 
     except Exception as e:
         print(f"Erro na análise de CV: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
-@services_bp.route("/send-report-email", methods=["POST"])
-def send_report_email():
+@services_bp.route("/deliver-report", methods=["POST"])
+def deliver_report():
+    """
+    Final delivery of the paid report via email with 2 attachments.
+    Implements the 'Guia de Escrita Editorial' requirements and Success Checklist.
+    """
     try:
-        data = request.get_json()
-        print(f"Dados recebidos para email de relatório: {data}")
+        import base64
+        from utils.report_pdf import ReportPDFGenerator
         
-        if not data:
-            return jsonify({"success": False, "error": "Dados não recebidos"}), 400
-            
-        email = data.get('email')
-        name = data.get('name')
-        report_data = data.get('reportData')
+        # 1. Capture Data
+        report_json = request.form.get("report")
+        if not report_json:
+            return jsonify({"success": False, "error": "Dados do relatório ausentes"}), 400
+        report_data = json.loads(report_json)
         
-        if not email or not name or not report_data:
-            return jsonify({"success": False, "error": "Dados obrigatórios em falta (Email, Nome, Dados do Relatório)"}), 400
+        cv_file = request.files.get("cv_file")
+        email = request.form.get("email")
+        name = request.form.get("name")
+        
+        if not all([cv_file, email, name]):
+            return jsonify({"success": False, "error": "Ficheiro original ou dados de contacto ausentes"}), 400
 
-        # E-mail Admin (rsshare2inspire@gmail.com conforme pedido do utilizador)
-        ADMIN_EMAIL = "rsshare2inspire@gmail.com"
+        # 2. SUCCESS CHECKLIST & PDF GENERATION
+        generator = ReportPDFGenerator()
+        pdf_bytes, status = generator.create_pdf(report_data)
         
-        # Gerar o conteúdo HTML do relatório (simplificado para o corpo do email ou link)
-        # Por agora, vamos enviar os detalhes principais no corpo do email
-        profile = report_data.get('candidate_profile', {})
-        verdict = report_data.get('final_verdict', {})
-        summary = report_data.get('executive_summary', {})
-        
-        email_html = f"""
-        <html>
-        <body style="font-family: 'Poppins', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; padding: 20px;">
-            <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
-                <!-- Header -->
-                <div style="text-align: center; padding: 40px 20px; background-color: #ffffff;">
-                    <img src="https://share2inspire.pt/images/logo.png" alt="Share2Inspire" style="max-width: 200px; height: auto;">
-                    <h1 style="color: #BF9A33; font-size: 24px; margin-top: 25px; font-weight: 700; letter-spacing: 1px;">Relatório de Análise de CV</h1>
-                </div>
-                
-                <!-- Body -->
-                <div style="padding: 0 40px 40px 40px;">
-                    <p style="font-size: 16px;">Olá <strong>{name}</strong>,</p>
-                    
-                    <p style="font-size: 15px; color: #555;">Obrigado por confiares na Share2Inspire para analisar o teu percurso profissional.</p>
-                    
-                    <p style="font-size: 15px; color: #555;">Em anexo, encontras o Relatório Completo de Análise de CV em PDF, onde aprofundamos a leitura estratégica do teu perfil, indo além da síntese apresentada no ecrã. Este documento detalha posicionamento, maturidade profissional, potencial de mercado e recomendações concretas para evolução.</p>
-                    
-                    <p style="font-size: 15px; color: #555;">A análise confirma um perfil de elevada senioridade, com forte alinhamento a funções de liderança estratégica em Transformação Digital, RH e Futuro do Trabalho. Mais do que um CV sólido, estamos perante uma narrativa profissional com potencial de diferenciação clara no mercado global.</p>
-                    
-                    <div style="margin-top: 35px; border-top: 1px solid #eee; padding-top: 30px;">
-                        <h3 style="color: #1a1a1a; font-size: 18px; margin-bottom: 20px; border-left: 4px solid #BF9A33; padding-left: 15px;">Próximos passos recomendados</h3>
-                        
-                        <!-- Kickstart Pro -->
-                        <div style="margin-bottom: 30px;">
-                            <h4 style="color: #BF9A33; margin-bottom: 10px; font-size: 16px;">1. Sessão estratégica Kickstart Pro</h4>
-                            <p style="font-size: 14px; color: #666; margin-bottom: 15px;">Uma sessão individual de follow up, focada em transformar insights em decisões concretas. Trabalhamos posicionamento, foco estratégico e próximos movimentos de carreira, com abordagem prática e orientada a impacto.</p>
-                            <a href="https://share2inspire.pt/pages/servicos.html#kickstart" style="display: inline-block; background-color: #BF9A33; color: white; padding: 12px 25px; text-decoration: none; border-radius: 50px; font-weight: 600; font-size: 14px;">👉 Agendar Kickstart Pro</a>
-                        </div>
-                        
-                        <!-- Revisão Profissional -->
-                        <div>
-                            <h4 style="color: #BF9A33; margin-bottom: 10px; font-size: 16px;">2. Revisão Profissional de CV</h4>
-                            <p style="font-size: 14px; color: #666; margin-bottom: 15px;">Uma revisão aprofundada, humana e orientada a mercado, alinhando narrativa, estrutura e impacto do CV, tanto para leitura humana como para sistemas ATS.</p>
-                            <a href="https://share2inspire.pt/pages/servicos.html#cv-review" style="display: inline-block; background-color: #1a1a1a; color: white; padding: 12px 25px; text-decoration: none; border-radius: 50px; font-weight: 600; font-size: 14px;">👉 Solicitar Revisão Profissional de CV</a>
-                        </div>
-                    </div>
-                    
-                    <p style="font-size: 14px; color: #888; margin-top: 40px;">Se preferires, podes também continuar a explorar o CV Analyzer, utilizando-o como ferramenta de diagnóstico contínuo.</p>
-                    
-                    <p style="font-size: 15px; color: #555; margin-top: 30px;">Estamos disponíveis para apoiar o próximo capítulo do teu percurso com clareza, estratégia e intenção.</p>
-                </div>
-                
-                <!-- Footer -->
-                <div style="background-color: #1a1a1a; color: #ffffff; padding: 40px 20px; text-align: center; border-radius: 0 0 12px 12px;">
-                    <p style="font-size: 15px; font-weight: 600; margin-bottom: 5px;">Com estima,</p>
-                    <p style="font-size: 16px; font-weight: 700; color: #BF9A33; margin: 0;">Equipa Share2Inspire</p>
-                    <p style="font-size: 13px; opacity: 0.8; margin-top: 10px;">Human-Centred Career & Transformation Advisory</p>
-                    <p style="font-size: 13px; margin-top: 20px;"><a href="https://share2inspire.pt" style="color: #BF9A33; text-decoration: none;">www.share2inspire.pt</a></p>
-                    
-                    <div style="margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; font-size: 11px; opacity: 0.6;">
-                        <p>© 2025 Share2Inspire. Todos os direitos reservados.</p>
-                        <p>Este é um envio automático, por favor não responda a este email.</p>
-                    </div>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-            to=[{"email": email, "name": name}],
-            bcc=[{"email": ADMIN_EMAIL, "name": "Admin Share2Inspire"}],
-            sender={"email": os.getenv("BREVO_SENDER_EMAIL", "srshare2inspire@gmail.com"), "name": "Share2Inspire Advisor"},
-            subject=f"O seu Relatório de Análise CV | Próximos Passos Estratégicos - {name}",
-            html_content=email_html
-        )
-        
-        try:
-            get_brevo_api().send_transac_email(send_smtp_email)
-            return jsonify({"success": True, "message": "Relatório enviado por email com sucesso!"})
-        except ApiException as e:
-            print(f"Erro Brevo: {e}")
-            return jsonify({"success": False, "error": str(e)}), 500
+        # System Rule: PDF must exist, >50KB, >=5 pages
+        if status != "OK":
+            print(f"Validation Checklist Failed: {status}")
+            # Fallback message as requested
+            return jsonify({
+                "success": True, 
+                "prepared": True, 
+                "message": "A análise está a ser preparada com detalhe editorial. Receberá o relatório no seu email em instantes."
+            }), 200
             
+        cv_content = cv_file.read()
+        if not cv_content:
+             return jsonify({"success": False, "error": "CV original está vazio"}), 400
+
+        # 3. Preparation of Attachments
+        safe_name = name.replace(" ", "_")
+        orig_filename = cv_file.filename or "Curriculo.pdf"
+        ext = os.path.splitext(orig_filename)[1] or ".pdf"
+        
+        attachments = [
+            {
+                "content": base64.b64encode(pdf_bytes).decode('utf-8'),
+                "name": f"Relatorio_Analise_CV_{safe_name}.pdf"
+            },
+            {
+                "content": base64.b64encode(cv_content).decode('utf-8'),
+                "name": f"CV_{safe_name}_Original{ext}"
+            }
+        ]
+
+        # 4. Premium Branded Email Content (Template 4)
+        from utils.email import send_email_with_attachments, get_email_template_4
+        email_html = get_email_template_4(name)
+
+        # 5. Send Transactional Email
+        success, msg = send_email_with_attachments(
+            to_email=email,
+            to_name=name,
+            subject=f"Relatório de Análise de CV | {name}",
+            html_content=email_html,
+            attachments=attachments
+        )
+
+        if success:
+            return jsonify({"success": True, "message": "Relatório enviado com sucesso!"}), 200
+        else:
+            return jsonify({"success": False, "error": f"Erro ao enviar email: {msg}"}), 500
+
     except Exception as e:
-        print(f"Erro no endpoint send-report-email: {str(e)}")
+        print(f"Erro na entrega do relatório: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
         return jsonify({"success": False, "error": str(e)}), 500

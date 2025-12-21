@@ -27,3 +27,4 @@ gunicorn
 google-cloud-secret-manager
 google-generativeai>=0.7.2
 PyPDF2
+xhtml2pdf
