@@ -212,8 +212,17 @@ def send_kickstart_email():
 
 @services_bp.route("/analyze-cv", methods=["POST"])
 def analyze_cv():
+    """
+    CV Analyzer - Paid Service Flow
+    1. Analyze CV
+    2. Create MBWAY payment
+    3. Send Email 3 with payment link
+    4. Return confirmation message (NOT the report - delivered via email after payment)
+    """
     try:
         from utils.analysis import CVAnalyzer
+        from routes.payment import create_mbway_payment, normalize_payment_data
+        from utils.email import send_email_with_attachments, get_email_template_3
         
         print("Endpoint /api/services/analyze-cv chamado")
         
@@ -229,6 +238,12 @@ def analyze_cv():
         data = request.form
         role = data.get('current_role', '')
         experience = data.get('experience', '')
+        email = data.get('email', '')
+        name = data.get('name', '')
+        phone = data.get('phone', '')
+        
+        if not all([email, name, phone]):
+            return jsonify({"success": False, "error": "Dados obrigatórios em falta (Email, Nome, Telefone)"}), 400
         
         # Executar análise
         analyzer = CVAnalyzer()
@@ -237,14 +252,57 @@ def analyze_cv():
         if "error" in report:
              return jsonify({"success": False, "error": report["error"]}), 400
 
-        # Enviar Lead para Admin (Opcional, mas recomendado para tracking)
-        # ... logic if needed ...
+        # Guardar análise temporariamente para envio posterior (após pagamento)
+        # TODO: Implementar storage temporário (Redis, DB, ou filesystem)
+        # Por agora o relatório será regenerado no callback de pagamento
+        
+        # >>> 1. Iniciar Pagamento MB WAY <<<
+        import pandas as pd
+        payment_data = {
+            "amount": "1.00",  # CV Analyzer = 1€
+            "orderId": f"CVA-{name.replace(' ', '')}-{int(pd.Timestamp.now().timestamp())}",
+            "phone": phone,
+            "email": email,
+            "description": f"CV Analyzer - {name}"
+        }
+        
+        # Normalizar e criar pagamento
+        print(f"Iniciando pagamento MB WAY de 1€ para {name}...")
+        normalized_payment = normalize_payment_data(payment_data)
+        payment_result = create_mbway_payment(normalized_payment)
+        
+        if not payment_result.get('success'):
+            print(f"Erro ao criar pagamento: {payment_result.get('error')}")
+            return jsonify({"success": False, "error": f"Erro ao iniciar pagamento MB WAY: {payment_result.get('error')}"}), 400
 
-        return jsonify({"success": True, "report": report}), 200
+        # >>> 2. Enviar Email 3 (Análise Concluída + Link de Pagamento) <<<
+        payment_link = payment_result.get('payment_url', "https://share2inspire.pt/pagamento")
+        html_content = get_email_template_3(name, payment_link)
+        
+        success, msg = send_email_with_attachments(
+            email, name, "Relatório de Análise de CV | Pagamento para acesso completo", html_content
+        )
+        
+        if not success:
+            print(f"Erro ao enviar email: {msg}")
+            # Se email falhar mas pagamento foi criado, avisamos
+            return jsonify({
+                "success": True, 
+                "message": "Pagamento iniciado, mas erro ao enviar email. Contacte o suporte.",
+                "payment": payment_result,
+                "warning": msg
+            }), 200
+        
+        # >>> 3. Retornar Mensagem de Confirmação (FALLBACK MESSAGE) <<<
+        return jsonify({
+            "success": True, 
+            "message": "O teu pedido foi recebido. Assim que o pagamento for confirmado, receberás um email com os próximos passos.",            "payment": payment_result
+        }), 200
 
     except Exception as e:
         print(f"Erro na análise de CV: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
 @services_bp.route("/deliver-report", methods=["POST"])
 def deliver_report():
     """

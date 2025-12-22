@@ -74,6 +74,7 @@ def get_premium_wrapper(content_body, button_text=None, button_link=None, suppor
             <tr>
                 <td align="center" style="padding: 24px 0;">
                     <img src="https://share2inspire.pt/images/logo.png" class="logo" width="180" style="display: block; border: 0;" alt="Share2Inspire">
+                    <p style="font-size: 13px; color: #666; margin-top: 12px; font-weight: 500; letter-spacing: 0.5px;">Carreira com clareza, estratégia e narrativa de impacto.</p>
                 </td>
             </tr>
             <tr>
