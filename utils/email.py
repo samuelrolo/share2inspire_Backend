@@ -139,6 +139,17 @@ def get_email_template_3(name, payment_link):
     """
     return get_premium_wrapper(body, "Pagar e receber relatório", payment_link, "O relatório inclui a análise aprofundada e o CV submetido em anexo.")
 
+def get_email_template_kickstart_v2(name, payment_link):
+    """Email. Envio de link de pagamento e aviso MBWAY Push, Kickstart Pro"""
+    body = f"""
+    <p>Olá {name},</p>
+    <p>Recebemos o teu agendamento para o Kickstart Pro.</p>
+    <p>Para confirmar a reserva, foi enviado um pedido de pagamento MB WAY para o teu telemóvel.</p>
+    <p>Se não recebeste a notificação ou preferes usar outro número, podes concluir o pagamento através do botão abaixo.</p>
+    <p>A tua sessão será confirmada automaticamente assim que o pagamento for processado.</p>
+    """
+    return get_premium_wrapper(body, "Pagar agora com MB Way", payment_link, "O horário escolhido fica pendente até à confirmação do pagamento.")
+
 def get_email_template_4(name):
     """Email 4. Confirmação de pagamento, todos os serviços"""
     body = f"""
@@ -148,7 +159,7 @@ def get_email_template_4(name):
     
     <div style="margin-top: 24px;">
         <p><strong>Kickstart Pro</strong><br>
-        Receberás em breve os detalhes da sessão e o respetivo link de acesso.</p>
+        Receberás em breve os detalhes da reunião e o respetivo link de acesso no email associado ao Google Calendar.</p>
         
         <p><strong>Revisão Profissional de CV</strong><br>
         O processo de elaboração do teu CV foi iniciado. Entraremos em contacto caso seja necessária informação adicional.</p>
