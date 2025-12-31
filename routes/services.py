@@ -1,14 +1,19 @@
 from flask import Blueprint, request, jsonify
 import os
 import json
+import logging
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
 from dotenv import load_dotenv
+from datetime import datetime
 
 # Carregar variáveis de ambiente
 load_dotenv()
 
 from utils.secrets import get_secret
+
+# Logger configuration
+logger = logging.getLogger(__name__)
 
 services_bp = Blueprint("services", __name__)
 
@@ -79,45 +84,78 @@ def request_cv_review():
         if not all([name, email, phone]):
              return jsonify({"success": False, "error": "Dados obrigatórios em falta (Nome, Email, Telefone)"}), 400
 
-        # >>> 1. Iniciar Pagamento MB WAY <<<
+        # >>> 1. Enviar EMAIL 1: Confirmação de Pedido <<<
+        from email_templates.transactional_emails import get_email_confirmacao_pedido
+        from datetime import datetime
+        
+        data_pedido = datetime.now().strftime('%d/%m/%Y')
+        subject_1, body_1 = get_email_confirmacao_pedido(
+            nome=name,
+            nome_do_servico=service_name,
+            data_pedido=data_pedido
+        )
+        
+        try:
+            get_brevo_api().send_transac_email(sib_api_v3_sdk.SendSmtpEmail(
+                to=[{"email": email, "name": name}],
+                subject=subject_1,
+                html_content=body_1.replace('\n', '<br>')
+            ))
+        except ApiException as e:
+            print(f"Erro ao enviar EMAIL 1: {e}")
+        
+        # >>> 2. Iniciar Pagamento MB WAY <<<
+        from routes.payment import create_mbway_payment, normalize_payment_data
+        
+        timestamp = int(datetime.now().timestamp())
         payment_data = {
             "amount": amount,
-            "orderId": data.get("orderId", f"CV-{name.replace(' ', '')}-{int(pd.Timestamp.now().timestamp())}" if 'pd' in locals() else f"CV-{name.replace(' ', '')}"),
+            "orderId": data.get("orderId", f"CV-{name.replace(' ', '')}-{timestamp}"),
             "phone": phone,
             "email": email,
             "description": f"{service_name} - {name}"
         }
         
-        # Normalizar e criar pagamento
         print(f"Iniciando pagamento MB WAY de {amount}€ para {name}...")
         normalized_payment = normalize_payment_data(payment_data)
         payment_result = create_mbway_payment(normalized_payment)
         
         if not payment_result.get('success'):
             print(f"Erro ao criar pagamento: {payment_result.get('error')}")
-            # Retornamos erro se pagamento falhar
-            return jsonify({"success": False, "error": f"Erro ao iniciar pagamento MB WAY: {payment_result.get('error')}"}), 400
+            return jsonify({
+                "success": False, 
+                "error": f"Erro ao iniciar pagamento MB WAY: {payment_result.get('error')}"
+            }), 400
 
-        # >>> 2. Enviar Email 2 (Pedido e Link de Pagamento)
-        from utils.email import send_email_with_attachments, get_email_template_2
+        # >>> 3. Enviar EMAIL 2: Pagamento MB Way <<<
+        from email_templates.transactional_emails import get_email_pagamento_mbway
         
-        # O link de pagamento real viria do payment_result se existir na API
-        payment_link = payment_result.get('payment_url', "https://share2inspire.pt/pagamento")
-        html_content = get_email_template_2(name, payment_link)
+        # Determinar prazo de entrega baseado no serviço
+        prazo_map = {
+            "CV Analyzer": "Imediato (após confirmação)",
+            "Revisão de CV": "3 dias úteis",
+            "Kickstart Pro": "Conforme horário agendado"
+        }
+        prazo_entrega = prazo_map.get(service_name, "A definir")
         
-        success, msg = send_email_with_attachments(
-            email, name, "Confirmação do pedido | Pagamento Revisão Profissional de CV", html_content
+        payment_link = payment_result.get('payment_url', f"https://share2inspire.pt/pages/pagamento.html?orderId={payment_data['orderId']}")
+        
+        subject_2, body_2 = get_email_pagamento_mbway(
+            nome=name,
+            nome_do_servico=service_name,
+            valor=f"{amount}€",
+            prazo_entrega=prazo_entrega,
+            link_pagamento_mbway=payment_link
         )
-
+        
         try:
             get_brevo_api().send_transac_email(sib_api_v3_sdk.SendSmtpEmail(
                 to=[{"email": email, "name": name}],
-                subject="Confirmação do pedido | Pagamento Revisão Profissional de CV",
-                html_content=html_content
+                subject=subject_2,
+                html_content=body_2.replace('\n', '<br>')
             ))
         except ApiException as e:
-            print(f"Erro Brevo: {e}")
-            # Se o email falhar, mas o pagamento foi iniciado, avisamos o user
+            print(f"Erro ao enviar EMAIL 2: {e}")
             return jsonify({
                 "success": True, 
                 "message": "Pagamento iniciado, mas erro ao enviar email de confirmação. Contacte o suporte.",
@@ -127,7 +165,7 @@ def request_cv_review():
 
         return jsonify({
             "success": True, 
-            "message": "O teu pedido foi recebido. Assim que o pagamento for confirmado, receberás um email com os próximos passos.",
+            "message": "Pedido confirmado! Verifica o teu email para concluir o pagamento.",
             "payment": payment_result
         }), 200
 
@@ -263,6 +301,10 @@ def request_report_payment():
     try:
         from routes.payment import create_mbway_payment, normalize_payment_data
         from datetime import datetime
+        from email_templates.transactional_emails import (
+            get_email_confirmacao_pedido,
+            get_email_pagamento_mbway
+        )
         
         print("Endpoint /api/services/request-report-payment chamado")
         
@@ -274,7 +316,24 @@ def request_report_payment():
         if not all([email, phone]):
             return jsonify({"success": False, "error": "Email e Telemóvel são obrigatórios"}), 400
         
-        # Criar pagamento MB WAY
+        # >>> 1. Enviar EMAIL 1: Confirmação de Pedido <<<
+        data_pedido = datetime.now().strftime('%d/%m/%Y')
+        subject_1, body_1 = get_email_confirmacao_pedido(
+            nome=name,
+            nome_do_servico="CV Analyzer",
+            data_pedido=data_pedido
+        )
+        
+        try:
+            get_brevo_api().send_transac_email(sib_api_v3_sdk.SendSmtpEmail(
+                to=[{"email": email, "name": name}],
+                subject=subject_1,
+                html_content=body_1.replace('\n', '<br>')
+            ))
+        except ApiException as e:
+            print(f"Aviso: Erro ao enviar EMAIL 1: {e}")
+        
+        # >>> 2. Criar pagamento MB WAY <<<
         timestamp = int(datetime.now().timestamp())
         payment_data = {
             "amount": "1.00",
@@ -288,11 +347,31 @@ def request_report_payment():
         payment_result = create_mbway_payment(normalized_payment)
         
         if not payment_result.get('success'):
-            return jsonify({"success": False, "error": f"Erro MB WAY: {payment_result.get('error')}"}), 400
+            return jsonify({"success": False, "error": f"Erro MB WAY: {payment_result.get('error')}\"}), 400
+
+        # >>> 3. Enviar EMAIL 2: Pagamento MB Way <<<
+        payment_link = payment_result.get('payment_url', f"https://share2inspire.pt/pages/pagamento.html?orderId={payment_data['orderId']}")
+        
+        subject_2, body_2 = get_email_pagamento_mbway(
+            nome=name,
+            nome_do_servico="CV Analyzer",
+            valor="1€",
+            prazo_entrega="Imediato (após confirmação)",
+            link_pagamento_mbway=payment_link
+        )
+        
+        try:
+            get_brevo_api().send_transac_email(sib_api_v3_sdk.SendSmtpEmail(
+                to=[{"email": email, "name": name}],
+                subject=subject_2,
+                html_content=body_2.replace('\n', '<br>')
+            ))
+        except ApiException as e:
+            print(f"Aviso: Erro ao enviar EMAIL 2: {e}")
 
         return jsonify({
             "success": True,
-            "message": "Pagamento MB WAY iniciado. Confirme na sua app.",
+            "message": "Pedido confirmado! Verifica o teu email e telemóvel para concluir o pagamento.",
             "payment": payment_result,
             "requestId": payment_result.get('requestId')
         }), 200
@@ -358,27 +437,33 @@ def deliver_report():
             }
         ]
 
-        # 4. Premium Branded Email Content (Template 4)
-        from utils.email import send_email_with_attachments, get_email_template_4
-        email_html = get_email_template_4(name)
-
-        # 5. Send Transactional Email
-        success, msg = send_email_with_attachments(
-            to_email=email,
-            to_name=name,
-            subject=f"Relatório de Análise de CV | {name}",
-            html_content=email_html,
-            attachments=attachments
+        # 4. Premium Branded Email Content (EMAIL 3: Entrega do Relatório)
+        from email_templates.transactional_emails import get_email_entrega_relatorio
+        
+        subject_3, body_3 = get_email_entrega_relatorio(
+            nome=name,
+            nome_do_servico="CV Analyzer"
         )
 
-        if success:
+        # 5. Send Transactional Email with Attachments
+        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+            to=[{"email": email, "name": name}],
+            bcc=[{"email": "srshare2inspire@gmail.com", "name": "Admin Share2Inspire"}],
+            sender={"email": os.getenv("BREVO_SENDER_EMAIL", "srshare2inspire@gmail.com"), "name": "Share2Inspire"},
+            subject=subject_3,
+            html_content=body_3.replace('\n', '<br>'),
+            attachment=attachments
+        )
+        
+        try:
+            get_brevo_api().send_transac_email(send_smtp_email)
             return jsonify({"success": True, "message": "Relatório enviado com sucesso!"}), 200
-        else:
-            return jsonify({"success": False, "error": f"Erro ao enviar email: {msg}"}), 500
+        except ApiException as e:
+            print(f"Erro ao enviar email: {e}")
+            return jsonify({"success": False, "error": f"Erro ao enviar email: {str(e)}"}), 500
 
     except Exception as e:
         print(f"Erro na entrega do relatório: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
         return jsonify({"success": False, "error": str(e)}), 500
 
 @services_bp.route("/kickstart-confirm", methods=["POST"])

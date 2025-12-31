@@ -17,6 +17,7 @@ import urllib.parse
 from flask import Blueprint, request, jsonify, Response
 from dotenv import load_dotenv
 from utils.secrets import get_secret
+from utils.datastore_client import get_datastore_client
 from utils.email import (
     send_email_with_attachments,
     get_email_template_1,
@@ -50,8 +51,11 @@ BREVO_SENDER_EMAIL = os.getenv('BREVO_SENDER_EMAIL', 'noreply@share2inspire.pt')
 # URL do Google Apps Script
 GOOGLE_APPS_SCRIPT_URL = os.getenv('GOOGLE_APPS_SCRIPT_URL', '')
 
-# Armazenamento temporário
-payment_data_store = {}
+# Anti-phishing key for webhook validation
+IFTHENPAY_ANTIPHISHING_KEY = get_secret('IFTHENPAY_ANTIPHISHING_KEY', default='dev-key-placeholder')
+
+# Datastore client for persistent storage
+datastore_client = get_datastore_client()
 
 def handle_cors_preflight():
     """Tratamento de CORS"""
@@ -230,6 +234,79 @@ def create_mbway_payment(data):
             'error': f"Erro interno: {str(e)}"
         }
 
+def check_mbway_payment_status(order_id, mb_way_key=None):
+    """
+    Verifica o status de um pagamento MB WAY via API Ifthenpay.
+    Usado para verificação manual antes do webhook estar ativo.
+    
+    Args:
+        order_id: ID do pedido/transação
+        mb_way_key: Chave MB WAY (opcional, usa global se não fornecido)
+        
+    Returns:
+        dict com status do pagamento
+    """
+    try:
+        if not mb_way_key:
+            mb_way_key = IFTHENPAY_MBWAY_KEY
+        
+        # Endpoint de verificação de status da Ifthenpay
+        status_url = "https://api.ifthenpay.com/spg/payment/mbway/status"
+        
+        params = {
+            "mbWayKey": mb_way_key,
+            "orderId": order_id
+        }
+        
+        logger.info(f"[STATUS CHECK] Verificando pagamento: {order_id}")
+        
+        response = requests.get(
+            status_url,
+            params=params,
+            timeout=15
+        )
+        
+        logger.info(f"[STATUS CHECK] Response - Status: {response.status_code}")
+        logger.info(f"[STATUS CHECK] Response - Body: {response.text}")
+        
+        if response.status_code == 200:
+            result = response.json()
+            
+            # Mapear status da Ifthenpay
+            status_code = result.get('Status', '')
+            
+            # Status codes comuns:
+            # "000" = Pending (aguardando confirmação)
+            # "PAGO" ou "SUCCESS" = Paid
+            # "REJECTED" = Rejected
+            # "EXPIRED" = Expired
+            
+            is_paid = status_code in ['PAGO', 'SUCCESS', '1']
+            is_pending = status_code in ['000', 'PENDING', '0']
+            
+            return {
+                'success': True,
+                'orderId': order_id,
+                'status': status_code,
+                'isPaid': is_paid,
+                'isPending': is_pending,
+                'amount': result.get('Amount'),
+                'message': result.get('Message', ''),
+                'rawResponse': result
+            }
+        else:
+            return {
+                'success': False,
+                'error': f"Erro ao verificar status: {response.status_code} - {response.text}"
+            }
+            
+    except Exception as e:
+        logger.error(f"[STATUS CHECK] Erro: {str(e)}")
+        return {
+            'success': False,
+            'error': f"Erro interno: {str(e)}"
+        }
+
 def create_payshop_payment(data):
     """Cria pagamento Payshop usando API oficial"""
     try:
@@ -295,13 +372,15 @@ def send_confirmation_email(email, name, payment_result, description=""):
         return False
     
     try:
-        # Gerar link de pagamento (Ifthenpay não gera link direto para MB Way via API, 
-        # o user recebe a notificação na app. Mas aqui simulamos o fluxo solicitado)
-        # Se for Multibanco/Payshop, enviamos os dados no corpo.
-        # Para simplificar conforme pedido, usaremos os templates sugeridos.
+        # Normalizar service description para matching robusto
+        service = description.lower().strip()
+        order_id = payment_result.get('orderId', '')
         
-        service = description.lower()
-        payment_link = "https://share2inspire.pt/pagamento" # Fallback
+        logger.info(f"[EMAIL] Selecionando template para serviço: '{description}' (normalized: '{service}')")
+        logger.info(f"[EMAIL] Order ID: {order_id}")
+        
+        # Gerar link de pagamento
+        payment_link = "https://share2inspire.pt/pagamento"  # Fallback
         
         # Tentar extrair link se existir no resultado
         if payment_result.get('payment_url'):
@@ -309,25 +388,44 @@ def send_confirmation_email(email, name, payment_result, description=""):
         elif payment_result.get('method') == 'multibanco':
             payment_link = f"https://share2inspire.pt/pagamento?ref={payment_result.get('reference')}"
 
-        if "kickstart" in service:
-            subject = "Confirmação do pedido | Pagamento Kickstart Pro"
-            html_content = get_email_template_1(name, payment_link)
-        elif "revisão" in service or "cv professional" in service:
-            subject = "Confirmação do pedido | Pagamento Revisão Profissional de CV"
-            html_content = get_email_template_2(name, payment_link)
-        elif "analyzer" in service or "análise" in service:
+        # Template selection com matching robusto e logging
+        # CV ANALYZER - PRIORIDADE MÁXIMA (check first to avoid fallback)
+        if any(keyword in service for keyword in ['analyzer', 'analyser', 'análise', 'analise']) or order_id.startswith('CVA-'):
             subject = "Relatório de Análise de CV | Pagamento para acesso completo"
             html_content = get_email_template_3(name, payment_link)
+            logger.info("[EMAIL] ✓ Template 3 selecionado (CV Analyzer)")
+        
+        # KICKSTART PRO
+        elif "kickstart" in service:
+            subject = "Confirmação do pedido | Pagamento Kickstart Pro"
+            html_content = get_email_template_1(name, payment_link)
+            logger.info("[EMAIL] ✓ Template 1 selecionado (Kickstart Pro)")
+        
+        # CV REVIEW / REVISÃO PROFISSIONAL
+        elif "revisão" in service or "revisao" in service or "cv review" in service or "cv professional" in service:
+            subject = "Confirmação do pedido | Pagamento Revisão Profissional de CV"
+            html_content = get_email_template_2(name, payment_link)
+            logger.info("[EMAIL] ✓ Template 2 selecionado (CV Review)")
+        
+        # FALLBACK
         else:
-            # Fallback genérico
             subject = "Confirmação de Pedido | Share2Inspire"
             html_content = get_email_template_1(name, payment_link)
+            logger.warning(f"[EMAIL] ⚠ Fallback Template 1 usado para serviço desconhecido: '{description}'")
 
+        logger.info(f"[EMAIL] Enviando para: {email} com subject: {subject}")
         success, msg = send_email_with_attachments(email, name, subject, html_content)
+        
+        if success:
+            logger.info(f"[EMAIL] ✓ Email enviado com sucesso para {email}")
+        else:
+            logger.error(f"[EMAIL] ✗ Falha ao enviar email: {msg}")
+        
         return success
         
     except Exception as e:
-        logger.error(f"Erro ao enviar email de pagamento: {str(e)}")
+        logger.error(f"[EMAIL] ✗ Erro ao enviar email de pagamento: {str(e)}")
+        logger.error(traceback.format_exc())
         return False
 
 @payment_bp.route('/initiate', methods=['POST', 'OPTIONS'])
@@ -373,13 +471,13 @@ def initiate_payment():
             )
             payment_result['emailSent'] = email_sent
         
-        # Guardar dados para callback
+        # Guardar dados para callback usando Datastore
         order_id = normalized_data.get('orderId')
-        payment_data_store[order_id] = {
-            'data': normalized_data,
-            'result': payment_result,
-            'timestamp': datetime.datetime.now().isoformat()
-        }
+        datastore_client.save_payment_record(
+            order_id=order_id,
+            payment_data=payment_result,
+            user_data=normalized_data
+        )
         
         return jsonify(payment_result)
         
@@ -394,66 +492,146 @@ def initiate_payment():
 @payment_bp.route('/callback', methods=['POST', 'GET', 'OPTIONS'])
 def payment_callback():
     """
-    Callback para notificações de pagamento Ifthenpay.
-    Implementa o fluxo: Pagamento Confirmado -> Email 4 -> Serviço Ativado.
+    DEPRECATED: Generic callback endpoint. Use /webhook-mbway instead.
+    Kept for backwards compatibility.
+    """
+    if request.method == 'OPTIONS':
+        return handle_cors_preflight()
+    
+    logger.warning("Legacy /callback endpoint called. Consider using /webhook-mbway.")
+    return webhook_mbway()
+
+
+@payment_bp.route('/webhook-mbway', methods=['POST', 'GET', 'OPTIONS'])
+def webhook_mbway():
+    """
+    Webhook dedicado para callbacks MB WAY da Ifthenpay.
+    Valida pagamento confirmado e dispara entrega automática de relatórios.
+    
+    Parâmetros esperados (GET query params ou POST form):
+    - chave: Anti-phishing key
+    - referencia: Order ID
+    - valor: Amount paid
+    - estado: Payment status ('PAGO' for success)
+    - data: Payment timestamp (dd-MM-yyyy HH:mm:ss)
     """
     if request.method == 'OPTIONS':
         return handle_cors_preflight()
     
     try:
-        # Obter parâmetros (Ifthenpay geralmente envia via GET para MB e MB Way)
+        # Obter parâmetros (Ifthenpay envia via GET para MB WAY)
         params = request.args.to_dict()
         if not params:
             params = request.get_json() if request.is_json else request.form.to_dict()
-            
-        logger.info(f"Callback Ifthenpay recebido: {params}")
         
-        # Validar callback (Geralmente por chave anti-fraude ou IP)
-        # Simplificando: Assumimos que se tem orderId e status=success
-        order_id = params.get('orderId') or params.get('referencia')
-        status = params.get('status') or params.get('estado')
+        logger.info(f"[WEBHOOK MB WAY] Recebido: {params}")
         
-        if order_id and order_id in payment_data_store:
-            stored_item = payment_data_store[order_id]
-            user_data = stored_item['data']
-            
-            # 1. Enviar Email 4 (Confirmação de Pagamento)
-            confirm_html = get_email_template_4(user_data.get('name'))
+        # 1. Validar Anti-Phishing Key
+        received_key = params.get('chave') or params.get('key')
+        if not received_key or received_key != IFTHENPAY_ANTIPHISHING_KEY:
+            logger.warning(f"[WEBHOOK MB WAY] Anti-phishing key inválida: {received_key}")
+            return Response("Invalid key", status=403)
+        
+        # 2. Extrair dados
+        order_id = params.get('referencia') or params.get('orderId') or params.get('id_pedido')
+        amount = params.get('valor') or params.get('amount')
+        status = params.get('estado') or params.get('status')
+        payment_date = params.get('data') or params.get('date')
+        
+        if not order_id:
+            logger.error("[WEBHOOK MB WAY] Order ID não fornecido")
+            return Response("Missing order ID", status=400)
+        
+        logger.info(f"[WEBHOOK MB WAY] OrderID: {order_id}, Amount: {amount}, Status: {status}")
+        
+        # 3. Validar status de pagamento
+        if status and status.upper() != 'PAGO':
+            logger.warning(f"[WEBHOOK MB WAY] Status não confirmado: {status}")
+            return Response("Payment not confirmed", status=200)  # Return 200 to stop retries
+        
+        # 4. Recuperar record do Datastore
+        record = datastore_client.get_payment_record(order_id)
+        
+        if not record:
+            logger.error(f"[WEBHOOK MB WAY] Record não encontrado: {order_id}")
+            return Response("Order not found", status=404)
+        
+        # 5. Verificar se já foi entregue (evitar duplicados)
+        if record.get('delivered'):
+            logger.info(f"[WEBHOOK MB WAY] Relatório já entregue para: {order_id}")
+            return Response("Already delivered", status=200)
+        
+        # 6. Atualizar record com dados de confirmação
+        datastore_client.update_record(order_id, {
+            'payment_confirmed_at': payment_date or datetime.datetime.now().isoformat(),
+            'payment_amount_confirmed': amount,
+            'payment_status': status
+        })
+        
+        # 7. Enviar Email 4 (Confirmação de Pagamento)
+        user_data = record.get('user_data', {})
+        if user_data.get('email'):
+            confirm_html = get_email_template_4(user_data.get('name', 'Cliente'))
             send_email_with_attachments(
-                user_data.get('email'), 
-                user_data.get('name'), 
-                "Pagamento confirmado | Próximos passos", 
+                user_data.get('email'),
+                user_data.get('name', 'Cliente'),
+                "Pagamento confirmado | Próximos passos",
                 confirm_html
             )
+        
+        # 8. Trigger automático de entrega se for CV Analyzer
+        description = user_data.get('description', '').lower()
+        if 'analyzer' in description or order_id.startswith('CVA-'):
+            logger.info(f"[WEBHOOK MB WAY] Disparando entrega automática para: {order_id}")
             
-            # 2. Ativar Serviço
-            service = user_data.get('description', '').lower()
-            if "analyzer" in service:
-                # Trigger automático do envio do PDF se for CV Analyzer
-                # Para isso, precisaríamos dos dados da análise. 
-                # Assumimos que foram guardados no stored_item.
-                logger.info(f"Ativando serviço CV Analyzer para {order_id}")
-                # Mock: No futuro, chamar deliver_report internamente
-            
-            logger.info(f"Serviço {service} ativado para {user_data.get('name')}")
-            
-            return jsonify({'success': True, 'message': 'Pagamento processado e serviço ativado'})
-            
-        return jsonify({'success': False, 'message': 'Pedido não encontrado'}), 404
+            # Tentar entregar relatório automaticamente
+            analysis_data = record.get('analysis_data')
+            if analysis_data:
+                try:
+                    # Import here to avoid circular dependency
+                    from routes.services import deliver_report_internal
+                    
+                    delivery_result = deliver_report_internal(
+                        order_id=order_id,
+                        analysis_data=analysis_data,
+                        user_data=user_data
+                    )
+                    
+                    if delivery_result.get('success'):
+                        logger.info(f"[WEBHOOK MB WAY] Relatório entregue com sucesso: {order_id}")
+                    else:
+                        logger.error(f"[WEBHOOK MB WAY] Erro ao entregar: {delivery_result.get('error')}")
+                        
+                except Exception as e:
+                    logger.error(f"[WEBHOOK MB WAY] Exceção ao entregar relatório: {e}")
+                    logger.error(traceback.format_exc())
+            else:
+                logger.warning(f"[WEBHOOK MB WAY] Sem dados de análise para: {order_id}")
+        
+        logger.info(f"[WEBHOOK MB WAY] Processamento concluído: {order_id}")
+        
+        # CRITICAL: Always return HTTP 200 to Ifthenpay to stop retries
+        return Response("OK", status=200)
         
     except Exception as e:
-        logger.error(f"Erro no callback: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logger.error(f"[WEBHOOK MB WAY] Erro: {str(e)}")
+        logger.error(traceback.format_exc())
+        # Still return 200 to avoid infinite retries
+        return Response("Error processed", status=200)
 
 @payment_bp.route('/status/<order_id>', methods=['GET', 'OPTIONS'])
 def check_payment_status(order_id):
-    """Verifica status de pagamento"""
+    """Verifica status de pagamento no Datastore (local)"""
     if request.method == 'OPTIONS':
         return handle_cors_preflight()
     
     try:
-        if order_id in payment_data_store:
-            return jsonify(payment_data_store[order_id])
+        record = datastore_client.get_payment_record(order_id)
+        if record:
+            return jsonify({
+                'success': True,
+                'record': record
+            })
         else:
             return jsonify({
                 'success': False,
@@ -463,6 +641,121 @@ def check_payment_status(order_id):
     except Exception as e:
         logger.error(f"Erro ao verificar status: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@payment_bp.route('/check-payment-status', methods=['GET', 'POST', 'OPTIONS'])
+def check_payment_status_and_deliver():
+    """
+    TEMPORARY ENDPOINT: Verifica status do pagamento via API Ifthenpay e entrega relatório se pago.
+    Usado até webhook estar ativo.
+    
+    Query params:
+        orderId: ID do pedido (requerido)
+    """
+    if request.method == 'OPTIONS':
+        return handle_cors_preflight()
+    
+    try:
+        # Obter orderId
+        order_id = request.args.get('orderId') or request.json.get('orderId') if request.is_json else None
+        
+        if not order_id:
+            return jsonify({
+                'success': False,
+                'error': 'orderId é obrigatório'
+            }), 400
+        
+        logger.info(f"[MANUAL CHECK] Verificação manual solicitada para: {order_id}")
+        
+        # 1. Verificar se já foi entregue
+        if datastore_client.is_delivered(order_id):
+            return jsonify({
+                'success': True,
+                'alreadyDelivered': True,
+                'message': 'Relatório já foi entregue anteriormente'
+            }), 200
+        
+        # 2. Verificar status na Ifthenpay
+        status_result = check_mbway_payment_status(order_id)
+        
+        if not status_result.get('success'):
+            return jsonify({
+                'success': False,
+                'error': 'Erro ao verificar status do pagamento',
+                'details': status_result.get('error')
+            }), 500
+        
+        # 3. Verificar se está pago
+        if status_result.get('isPaid'):
+            logger.info(f"[MANUAL CHECK] Pagamento confirmado para: {order_id}")
+            
+            # Recuperar dados do Datastore
+            record = datastore_client.get_payment_record(order_id)
+            
+            if not record:
+                return jsonify({
+                    'success': False,
+                    'error': 'Dados do pedido não encontrados'
+                }), 404
+            
+            # Entregar relatório automaticamente
+            analysis_data = record.get('analysis_data')
+            user_data = record.get('user_data')
+            
+            if not analysis_data or not user_data:
+                return jsonify({
+                    'success': False,
+                    'error': 'Dados incompletos para entrega'
+                }), 400
+            
+            # Import aqui para evitar circular dependency
+            from routes.services import deliver_report_internal
+            
+            delivery_result = deliver_report_internal(
+                order_id=order_id,
+                analysis_data=analysis_data,
+                user_data=user_data
+            )
+            
+            if delivery_result.get('success'):
+                return jsonify({
+                    'success': True,
+                    'paid': True,
+                    'delivered': True,
+                    'message': 'Pagamento confirmado! Relatório enviado para o teu email.'
+                }), 200
+            else:
+                return jsonify({
+                    'success': False,
+                    'paid': True,
+                    'delivered': False,
+                    'error': 'Pagamento confirmado mas erro ao entregar relatório',
+                    'details': delivery_result.get('error')
+                }), 500
+                
+        elif status_result.get('isPending'):
+            return jsonify({
+                'success': True,
+                'paid': False,
+                'pending': True,
+                'message': 'Pagamento ainda não confirmado. Por favor confirma no MB WAY e tenta novamente.'
+            }), 200
+        else:
+            return jsonify({
+                'success': True,
+                'paid': False,
+                'pending': False,
+                'message': 'Pagamento não foi concluído ou expirou. Por favor cria um novo pedido.',
+                'status': status_result.get('status')
+            }), 200
+            
+    except Exception as e:
+        logger.error(f"[MANUAL CHECK] Erro: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno ao verificar pagamento'
+        }), 500
             
 @payment_bp.route('/multibanco', methods=['POST', 'OPTIONS'])
 def process_multibanco_payment():
