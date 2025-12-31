@@ -775,7 +775,12 @@ def process_multibanco_payment():
         
         if result['success']:
              # Enviar email se sucesso
-            send_confirmation_email(normalized_data.get('email'), normalized_data.get('name'), result)
+            send_confirmation_email(
+                normalized_data.get('email'), 
+                normalized_data.get('name'), 
+                result,
+                normalized_data.get('description', '')
+            )
             return jsonify(result)
         else:
             return jsonify(result), 500
@@ -800,7 +805,12 @@ def process_mbway_payment():
         result = create_mbway_payment(normalized_data)
         
         if result['success']:
-            send_confirmation_email(normalized_data.get('email'), normalized_data.get('name'), result)
+            send_confirmation_email(
+                normalized_data.get('email'), 
+                normalized_data.get('name'), 
+                result,
+                normalized_data.get('description', '')
+            )
             return jsonify(result)
         else:
             return jsonify(result), 500
@@ -825,7 +835,12 @@ def process_payshop_payment():
         result = create_payshop_payment(normalized_data)
         
         if result['success']:
-            send_confirmation_email(normalized_data.get('email'), normalized_data.get('name'), result)
+            send_confirmation_email(
+                normalized_data.get('email'), 
+                normalized_data.get('name'), 
+                result,
+                normalized_data.get('description', '')
+            )
             return jsonify(result)
         else:
             return jsonify(result), 500
