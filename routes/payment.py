@@ -805,12 +805,15 @@ def process_mbway_payment():
         result = create_mbway_payment(normalized_data)
         
         if result['success']:
-            send_confirmation_email(
-                normalized_data.get('email'), 
-                normalized_data.get('name'), 
-                result,
-                normalized_data.get('description', '')
-            )
+            # SKIP email for MB WAY - user receives push notification on phone
+            # Email will be sent AFTER payment confirmation with PDF report
+            # send_confirmation_email(
+            #     normalized_data.get('email'), 
+            #     normalized_data.get('name'), 
+            #     result,
+            #     normalized_data.get('description', '')
+            # )
+            logger.info(f"[MB WAY] Pagamento iniciado, push notification enviada para {normalized_data.get('phone')}")
             return jsonify(result)
         else:
             return jsonify(result), 500
