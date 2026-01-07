@@ -258,29 +258,47 @@ def analyze_cv():
     try:
         from utils.analysis import CVAnalyzer
         
-        print("Endpoint /api/services/analyze-cv chamado (FREE ANALYSIS)")
+        logger.info("="*50)
+        logger.info("Endpoint /api/services/analyze-cv chamado (FREE ANALYSIS)")
         
         # Validar ficheiro
         if 'cv_file' not in request.files:
+            logger.error("Ficheiro cv_file não encontrado no request")
+            logger.info(f"Files recebidos: {list(request.files.keys())}")
             return jsonify({"success": False, "error": "Ficheiro não encontrado"}), 400
             
         file = request.files['cv_file']
         if file.filename == '':
+            logger.error("Nome de ficheiro vazio")
             return jsonify({"success": False, "error": "Nome de ficheiro inválido"}), 400
 
+        logger.info(f"Ficheiro recebido: {file.filename}")
+        
         # Validar outros dados (apenas nome para personalização)
         data = request.form
         role = data.get('current_role', '')
         experience = data.get('experience', '')
         name = data.get('name', 'Candidato')
         
+        logger.info(f"Dados: role={role}, experience={experience}, name={name}")
+        
         # Executar análise
+        logger.info("Inicializando CVAnalyzer...")
         analyzer = CVAnalyzer()
+        logger.info(f"CVAnalyzer inicializado. API Key presente: {analyzer.api_key is not None}")
+        logger.info(f"Model inicializado: {analyzer.model is not None}")
+        
+        logger.info("Iniciando análise do CV...")
         report = analyzer.analyze(file, file.filename, role, experience)
+        logger.info(f"Análise concluída. Tem erro: {'error' in report}")
         
         if "error" in report:
-             return jsonify({"success": False, "error": report["error"]}), 400
+            logger.error(f"Erro na análise: {report['error']}")
+            return jsonify({"success": False, "error": report["error"]}), 400
 
+        logger.info("Retornando resultado com sucesso")
+        logger.info("="*50)
+        
         # Retornar análise diretamente (SEM pagamento)
         return jsonify({
             "success": True,
@@ -289,7 +307,7 @@ def analyze_cv():
         }), 200
 
     except Exception as e:
-        print(f"Erro na análise de CV: {e}")
+        logger.exception(f"Erro crítico na análise de CV: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @services_bp.route("/request-report-payment", methods=["POST"])
