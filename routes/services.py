@@ -248,13 +248,22 @@ def send_kickstart_email():
         print(f"Erro no endpoint kickstart-email: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@services_bp.route("/analyze-cv", methods=["POST"])
+@services_bp.route("/analyze-cv", methods=["POST", "OPTIONS"])
 def analyze_cv():
     """
     CV Analyzer - FREE Analysis Flow
     Returns analysis results directly to show on screen.
     Payment is handled separately when user chooses to get full report.
     """
+    # Tratar pedidos OPTIONS para CORS
+    if request.method == "OPTIONS":
+        from flask import make_response
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
+        return response, 200
+    
     try:
         from utils.analysis import CVAnalyzer
         
@@ -310,12 +319,21 @@ def analyze_cv():
         logger.exception(f"Erro crítico na análise de CV: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@services_bp.route("/request-report-payment", methods=["POST"])
+@services_bp.route("/request-report-payment", methods=["POST", "OPTIONS"])
 def request_report_payment():
     """
     CV Analyzer - Request paid report (1€ MB WAY)
     Called when user clicks "Quero Relatório Personalizado"
     """
+    # Tratar pedidos OPTIONS para CORS
+    if request.method == "OPTIONS":
+        from flask import make_response
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
+        return response, 200
+    
     try:
         from routes.payment import create_mbway_payment, normalize_payment_data
         from datetime import datetime
