@@ -22,7 +22,16 @@ load_dotenv()
 
 # Criar aplicação Flask
 app = Flask(__name__)
-CORS(app)
+
+# Configuração CORS explícita para permitir todas as origens
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["*"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+        "supports_credentials": False
+    }
+})
 
 # Registar Blueprints
 # /api/payment/...
