@@ -383,7 +383,7 @@ def request_report_payment():
         payment_result = create_mbway_payment(normalized_payment)
         
         if not payment_result.get('success'):
-            return jsonify({"success": False, "error": f"Erro MB WAY: {payment_result.get('error')}\"}), 400
+           return jsonify({"success": False, "error": f"Erro MB WAY: {payment_result.get('error')}"}), 400
 
         # >>> 3. Enviar EMAIL 2: Pagamento MB Way <<<
         payment_link = payment_result.get('payment_url', f"https://share2inspire.pt/pages/pagamento.html?orderId={payment_data['orderId']}")
