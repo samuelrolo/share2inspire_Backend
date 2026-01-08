@@ -8,12 +8,12 @@ def get_email_confirmacao_pedido(nome, nome_do_servico, data_pedido):
     EMAIL 1: Confirmação de Pedido
     Trigger: Submissão de pedido concluída com sucesso, antes de qualquer pagamento
     """
-    subject = "Confirmámos o teu pedido | Share2Inspire"
+    subject = "Confirmamos o seu pedido | Share2Inspire"
     
     body = f"""
 Olá {nome},
 
-Obrigado por confiares na Share2Inspire.
+Obrigado por confiar na Share2Inspire.
 
 Recebemos o teu pedido de {nome_do_servico} e estamos a preparar os próximos passos para avançarmos contigo de forma clara e estruturada.
 
@@ -23,7 +23,7 @@ Data do pedido: {data_pedido}
 
 Em breve vais receber um novo email com as instruções seguintes, incluindo, quando aplicável, os detalhes para pagamento seguro via MB Way.
 
-Até já,
+Atenciosamente,
 Equipa Share2Inspire
 Human Centred Career & Knowledge Platform
 www.share2inspire.pt

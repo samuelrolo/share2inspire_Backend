@@ -61,7 +61,7 @@ def request_cv_review():
         
         # Dados de Serviço e Pagamento Dinâmicos
         service_name = data.get("service", "Revisão de CV") # Ex: "Revisão de CV", "Pack Completo"
-        amount = data.get("amount", "20.00") # Default atualizado para 20.00
+        amount = data.get("amount", "2.99") # Default atualizado para 20.00
         
         # Mapeamento do campo de características/objetivos
         # O formulário envia 'ad_characteristics' como principal campo de texto, mas também pode ter 'objectives'
