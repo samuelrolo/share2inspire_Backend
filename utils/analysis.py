@@ -255,7 +255,7 @@ class CVAnalyzer:
             """
 
             # Gerar o conteúdo
-            response = self.model.generate_content([prompt, uploaded_file])
+            response = self.model.generate_content(prompt, uploaded_file)
             
             # Limpar e extrair o JSON
             cleaned_text = response.text.strip().replace("```json", "").replace("```", "")
