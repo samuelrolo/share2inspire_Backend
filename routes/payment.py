@@ -283,7 +283,7 @@ def check_mbway_payment_status(request_id, mb_way_key=None):
             # Qualquer outro código com Message "Success" = Pago
             # "REJECTED" ou similar = Rejeitado
             
-            is_paid = (status_code != '000' and message.lower() == 'success') or status_code in ['PAGO', 'SUCCESS', '2.99', '2,99']
+            is_paid = (status_code != '000' and message.lower() == 'success') or status_code in ['PAGO', 'SUCCESS', '2.99', '2,99', 'SETTLED']
             is_pending = status_code == '000'
             
             logger.info(f"[STATUS CHECK] Status: {status_code}, Message: {message}, isPaid: {is_paid}, isPending: {is_pending}")
@@ -538,7 +538,7 @@ def webhook_mbway():
         
         # 2. Extrair dados
         order_id = params.get('referencia') or params.get('orderId') or params.get('id_pedido')
-        amount = (params.get('valor') or params.get('amount', '2.99')).replace(',', '.')
+        amount = str(params.get('valor') or params.get('amount', '2.99')).replace(',', '.')
         status = params.get('estado') or params.get('status')
         payment_date = params.get('data') or params.get('date')
         
