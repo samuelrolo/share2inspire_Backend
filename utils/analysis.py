@@ -12,12 +12,11 @@ class CVAnalyzer:
         self.api_key = get_secret("GEMINI_API_KEY")
         if self.api_key:
             genai.configure(api_key=self.api_key)
-            # Use a model that supports JSON mode well, e.g., gemini-1.5-flash or pro
             self.model = genai.GenerativeModel('gemini-1.5-flash')
         else:
             self.model = None
 
-        # Heuristic fallbacks (stripped down for class brevity if not used)
+        # Heuristic fallbacks
         self.sections = {
             "experience": ["experiência", "experience", "profissional", "work history", "employment"],
             "education": ["formação", "education", "educação", "academico", "academic", "estudos"],
@@ -36,7 +35,6 @@ class CVAnalyzer:
                 for page in reader.pages:
                     text += page.extract_text() + "\n"
             else:
-                # Fallback for text/other formats if supported
                 text = file_stream.read().decode('utf-8', errors='ignore')
         except Exception as e:
             print(f"Error extracting text: {e}")
@@ -46,10 +44,9 @@ class CVAnalyzer:
     def analyze(self, file_stream, filename, role, experience_level):
         """
         Main analysis method using Gemini File API for robust PDF handling.
-        Tries Gemini first, falls back to heuristics.
+        Generates comprehensive analysis for both screen display and PDF report.
         """
         if not self.model:
-            # Try to re-init model with standard 1.5 flash name if not set
             if self.api_key:
                  self.model = genai.GenerativeModel('gemini-1.5-flash')
             else:
@@ -62,8 +59,6 @@ class CVAnalyzer:
         try:
             print(f"Iniciando análise AI via File API para {filename}...")
             
-            # Save file temporarily to upload (File API requires path or file-like with name often)
-            # We will use a temp file for safety
             import tempfile
             
             suffix = ".pdf" if filename.lower().endswith(".pdf") else ".txt"
@@ -72,43 +67,42 @@ class CVAnalyzer:
                 tmp.write(file_stream.read())
                 tmp_path = tmp.name
 
-            # Upload to Gemini
             mime_type = "application/pdf" if suffix == ".pdf" else "text/plain"
             uploaded_file = genai.upload_file(tmp_path, mime_type=mime_type)
             
-            # Wait for file processing if needed (small PDFs are usually instant, but good practice)
-            # Active wait loop could be added here if files are large, but for CVs usually fine.
-            
-            # Definição do Prompt com princípios editoriais Share2Inspire e Requisitos Funcionais
+            # PROMPT EXPANDIDO - Análise completa com foco em valor prático
             prompt = f"""
-            Act as a Senior Recruitment Specialist, Career Consultant, and ATS Expert.
-            Analyze this CV content for a professional targeting '{role}' with '{experience_level}' experience.
+            Atua como Especialista Sénior em Recrutamento, Consultor de Carreira e Especialista em ATS.
+            Analisa este CV para um profissional que visa '{role}' com experiência '{experience_level}'.
             
-            EDITORIAL PRINCIPLES (MANDATORY):
-            - Clarity over sophistication. Strategy over praise. Actionable info. 
-            - Human, professional language (not promotional).
-            - Forbidden Words (NEVER USE): "Consultoria", "Projeto", "Implementação", "Formação", "Metodologia proprietária", "Framework exclusivo".
-            - Replacements: "Acompanhamento", "Decisão", "Posicionamento", "Clareza estratégica", "Conhecimento aplicável".
+            IMPORTANTE: Toda a resposta DEVE ser em Português de Portugal (PT-PT).
             
-            INPUT CONTEXT:
-            Target Role: {role}
-            Target Seniority: {experience_level}
+            PRINCÍPIOS EDITORIAIS (OBRIGATÓRIOS):
+            - Clareza acima de sofisticação. Estratégia acima de elogios. Informação acionável.
+            - Linguagem humana e profissional (não promocional).
+            - Palavras Proibidas (NUNCA USAR): "Consultoria", "Projeto", "Implementação", "Formação", "Metodologia proprietária", "Framework exclusivo".
+            - Substituições: "Acompanhamento", "Decisão", "Posicionamento", "Clareza estratégica", "Conhecimento aplicável".
             
-            SCORING DIMENSIONS (0-20 each):
+            CONTEXTO DE ENTRADA:
+            Função Alvo: {role}
+            Senioridade Alvo: {experience_level}
+            
+            DIMENSÕES DE PONTUAÇÃO (0-20 cada):
             1. Estrutura e Clareza: Ordem lógica, clareza de títulos, fluidez (objetivo: leitura < 20s). Penalizar textos densos.
             2. Conteúdo e Relevância: Adequação à senioridade, especificidade, progressão profissional.
-            3. Compatibilidade ATS: Keywords da função, verbos de ação, estrutura de parsing. (Reconhecer sinónimos).
+            3. Compatibilidade ATS: Keywords da função, verbos de ação, estrutura de parsing.
             4. Impacto e Resultados: Métricas evidentes, KPIs, percentagens, outcomes vs tarefas.
             5. Marca Pessoal e Proposta de Valor: Identidade profissional clara, narrativa diferenciada, resumo forte.
             6. Riscos e Inconsistências: Lacunas temporais, mudanças frequentes, transições não explicadas.
             
-            OUTPUT STRUCTURE (JSON):
+            ESTRUTURA DE OUTPUT (JSON):
             {{
                 "candidate_profile": {{
-                    "detected_name": "Nome",
-                    "detected_role": "Função",
-                    "total_years_exp": "Anos de experiência acumulada: N",
-                    "seniority": "Senioridade Detetada"
+                    "detected_name": "Nome completo do candidato",
+                    "detected_role": "Função atual/principal identificada",
+                    "detected_sector": "Setor/Indústria identificado (ex: Tecnologia, Banca, Saúde, Retalho, Consultoria, etc.)",
+                    "total_years_exp": "X anos",
+                    "seniority": "Junior | Mid-Level | Sénior | Executivo"
                 }},
                 "executive_summary": {{
                     "three_sentences": [
@@ -129,7 +123,7 @@ class CVAnalyzer:
                 "premium_indicators": {{
                     "value_prop_index": <int 0-10>,
                     "maturity_vs_role": "abaixo do esperado | adequado | acima da média",
-                    "results_density": "<int 0-100>%",
+                    "results_density": "<int>%",
                     "narrative_consistency": <int 0-100>
                 }},
                 "roadmap": {{
@@ -142,15 +136,104 @@ class CVAnalyzer:
                 }},
                 "final_verdict": {{
                     "score": <int 0-100>,
-                    "badge": "excelente (85-100) | forte (70-84) | adequado (50-69) | necessita revisão (0-49)"
+                    "badge": "Excelente (85-100) | Forte (70-84) | Adequado (50-69) | Necessita Revisão (0-49)"
+                }},
+                
+                "pdf_extended_content": {{
+                    "sector_analysis": {{
+                        "identified_sector": "Nome do setor identificado",
+                        "sector_trends": "Tendências atuais do setor em Portugal e Europa",
+                        "competitive_landscape": "Descrição do panorama competitivo para esta função neste setor"
+                    }},
+                    
+                    "critical_certifications": [
+                        {{
+                            "name": "Nome da certificação (ex: PMP, PROSCI, ITIL, etc.)",
+                            "issuer": "Entidade certificadora",
+                            "relevance": "Porque é crítica para esta função/setor",
+                            "priority": "Alta | Média | Baixa",
+                            "estimated_investment": "Custo aproximado e duração",
+                            "where_to_get": "Onde obter em Portugal ou online"
+                        }}
+                    ],
+                    
+                    "phrase_improvements": [
+                        {{
+                            "original": "Frase original extraída do CV (copiar exatamente)",
+                            "problem": "O que está mal nesta frase",
+                            "improved": "Versão melhorada da frase com impacto e métricas",
+                            "explanation": "Explicação de porque a versão melhorada é superior"
+                        }}
+                    ],
+                    
+                    "cv_design_tips": {{
+                        "layout": "Dicas específicas de layout e estrutura visual",
+                        "typography": "Recomendações de fontes e tamanhos",
+                        "spacing": "Dicas de espaçamento e margens",
+                        "sections_order": "Ordem recomendada das secções para este perfil",
+                        "length": "Recomendação de número de páginas",
+                        "visual_elements": "O que incluir/evitar (gráficos, cores, fotos)"
+                    }},
+                    
+                    "writing_guide": {{
+                        "power_verbs": ["Lista de 10 verbos de ação recomendados para esta função"],
+                        "keywords_to_add": ["Lista de 10 keywords ATS críticas para esta função"],
+                        "phrases_to_avoid": ["Lista de 5 frases/expressões a evitar"],
+                        "quantification_tips": "Como quantificar realizações nesta área específica"
+                    }},
+                    
+                    "professional_development": {{
+                        "short_term": [
+                            {{
+                                "action": "Ação específica a tomar nos próximos 30 dias",
+                                "expected_impact": "Impacto esperado na carreira",
+                                "resources": "Recursos específicos (cursos, livros, eventos)"
+                            }}
+                        ],
+                        "medium_term": [
+                            {{
+                                "action": "Ação para os próximos 3-6 meses",
+                                "expected_impact": "Impacto esperado",
+                                "resources": "Recursos específicos"
+                            }}
+                        ],
+                        "long_term": [
+                            {{
+                                "action": "Objetivos para 1-2 anos",
+                                "expected_impact": "Impacto na progressão de carreira",
+                                "resources": "Recursos e investimentos necessários"
+                            }}
+                        ]
+                    }},
+                    
+                    "networking_strategy": {{
+                        "linkedin_optimization": "Dicas específicas para otimizar o perfil LinkedIn",
+                        "key_communities": ["Comunidades profissionais relevantes em Portugal"],
+                        "events_to_attend": ["Tipos de eventos/conferências recomendados"],
+                        "thought_leadership": "Como construir presença como especialista na área"
+                    }},
+                    
+                    "salary_positioning": {{
+                        "market_range": "Intervalo salarial típico para esta função/senioridade em Portugal",
+                        "negotiation_leverage": "Pontos fortes do CV para negociação salarial",
+                        "gaps_to_address": "O que falta para justificar salário mais elevado"
+                    }}
                 }}
             }}
+            
+            INSTRUÇÕES ADICIONAIS:
+            1. Para "phrase_improvements", extrai 3-5 frases REAIS do CV e mostra como melhorá-las
+            2. Para "critical_certifications", recomenda 3-5 certificações ESPECÍFICAS para o setor identificado
+            3. Todas as recomendações devem ser práticas e acionáveis
+            4. Usa exemplos concretos sempre que possível
+            5. O conteúdo deve ser útil mesmo para quem não conhece a área
+            6. Foca em certificações reconhecidas internacionalmente mas disponíveis em Portugal
             """
 
             # Generate Content with File reference
             response = self.model.generate_content([prompt, uploaded_file])
             
-            # Cleanup File from Gemini (Optional but good practice)
+            # Cleanup File from Gemini
             try:
                 uploaded_file.delete()
             except Exception as e:
@@ -175,12 +258,12 @@ class CVAnalyzer:
             report["score_band"] = report.get("final_verdict", {}).get("badge", "N/A")
             radar = report.get("radar_data", {})
             report["dimensions"] = {
-                "structure": int(radar.get("estrutura", 0) / 4), # Scale 20 to 5
+                "structure": int(radar.get("estrutura", 0) / 4),
                 "content": int(radar.get("conteudo", 0) / 4),
                 "ats": int(radar.get("ats", 0) / 4),
                 "impact": int(radar.get("impacto", 0) / 4),
                 "branding": int(radar.get("branding", 0) / 4),
-                "risks": 5 - int(radar.get("riscos", 0) / 4) # Inverse for risk
+                "risks": 5 - int(radar.get("riscos", 0) / 4)
             }
             return report
 
@@ -206,72 +289,107 @@ class CVAnalyzer:
         """Fallback estruturado para quando a AI falha ou não está configurada."""
         clean_text = text.lower()
         
-        # Lógica simplificada de scores
-        structure_score = self._score_structure(clean_text) * 5 # Scale to 100 roughly
+        structure_score = self._score_structure(clean_text) * 5
         metrics_count = len(self.metrics_pattern.findall(text))
         impact_score = min(100, metrics_count * 10)
         
-        # Estrutura compatível com o novo output
         return {
             "candidate_profile": {
-                "detected_name": "Candidato (Heurística)",
+                "detected_name": "Candidato (Análise Básica)",
                 "detected_role": role or "Profissional",
+                "detected_sector": "A identificar",
                 "total_years_exp": experience_level or "Não detetada",
-                "seniority": "Verificar manual"
+                "seniority": "A verificar"
             },
             "executive_summary": {
                 "market_fit_score": 60,
-                "screen_summary": [
-                    { "title": "Estrutura Base", "metric": "Completa", "detail": "Secções essenciais detetadas." }
-                ],
-                "pdf_extended": "O perfil apresenta uma base sólida, mas requer maior ênfase em decisões estratégicas e métricas de impacto."
-            },
-            "maturity_and_skills": [
-                { "title": "Comunicação", "metric": "Base", "detail": "Capacidade de expressão detetada." },
-                { "title": "Organização", "metric": "Base", "detail": "Gestão de fluxos identificada." }
-            ],
-            "key_strengths": [
-                { "title": "Presença Digital", "metric": "Sim", "detail": "LinkedIn ou contactos presentes." },
-                { "title": "Estrutura", "metric": "80%", "detail": "Leitura facilitada por secções." }
-            ],
-            "evolution_roadmap": {
-                "screen_summary": [
-                    { "title": "Otimização de Métricas", "metric": "Alta", "detail": "Adicionar números às conquistas." }
-                ],
-                "pdf_details": [
-                    { 
-                        "title": "Foco em Resultados", 
-                        "context": "A análise heurística indica falta de indicadores quantitativos.", 
-                        "actions": ["Rever cada cargo", "Adicionar métricas de 0-100%"] 
-                    }
+                "three_sentences": [
+                    "Perfil com base sólida identificada.",
+                    "Necessita de maior detalhe em métricas de impacto.",
+                    "Recomenda-se revisão com análise AI completa."
                 ]
             },
-            "strategic_feedback": {
-                "screen_summary": "Posicionamento sólido, mas passivo. Necessita de proatividade visual.",
-                "pdf_details": {
-                    "market_read": "Mercado competitivo exige diferenciação clara.",
-                    "what_to_reinforce": "Sinais de liderança e autonomia.",
-                    "what_to_adjust": "Verbos de ação e clareza estratégica."
-                }
+            "dimensions": {
+                "estrutura": {"score": 12, "signal": "Estrutura base presente", "missing": "Análise AI necessária", "upgrade": "Submeter novamente"},
+                "conteudo": {"score": 10, "signal": "Conteúdo identificado", "missing": "Análise detalhada", "upgrade": "Verificar manualmente"},
+                "ats": {"score": 10, "signal": "Formato básico OK", "missing": "Keywords específicas", "upgrade": "Otimizar para ATS"},
+                "impacto": {"score": 8, "signal": "Algumas métricas", "missing": "Quantificação", "upgrade": "Adicionar números"},
+                "branding": {"score": 10, "signal": "Perfil identificável", "missing": "Diferenciação", "upgrade": "Reforçar proposta de valor"},
+                "riscos": {"score": 5, "signal": "Análise limitada", "missing": "Verificação completa", "upgrade": "Reanalisar"}
             },
             "radar_data": {
-                "ats": 65,
-                "impact": 50,
-                "structure": 75,
-                "market_fit": 60,
-                "readiness": 60
+                "estrutura": 12,
+                "conteudo": 10,
+                "ats": 10,
+                "impacto": 8,
+                "branding": 10,
+                "riscos": 5
             },
             "final_verdict": {
-                "score": 60,
-                "badge": "Base Sólida"
+                "score": 55,
+                "badge": "Análise Básica"
             },
-            "global_score": 60,
-            "score_band": "Base Sólida",
-            "is_fallback": True
+            "global_score": 55,
+            "score_band": "Análise Básica",
+            "is_fallback": True,
+            "pdf_extended_content": {
+                "sector_analysis": {
+                    "identified_sector": "A identificar com análise completa",
+                    "sector_trends": "Submeta novamente para análise detalhada do setor.",
+                    "competitive_landscape": "Análise de mercado requer processamento AI."
+                },
+                "critical_certifications": [
+                    {
+                        "name": "Certificação Genérica",
+                        "issuer": "A determinar",
+                        "relevance": "Análise AI necessária para recomendações específicas",
+                        "priority": "Média",
+                        "estimated_investment": "Variável",
+                        "where_to_get": "Pesquisar após análise completa"
+                    }
+                ],
+                "phrase_improvements": [
+                    {
+                        "original": "Análise de frases requer processamento AI",
+                        "problem": "Não foi possível extrair frases sem análise completa",
+                        "improved": "Submeta novamente para obter sugestões de melhoria",
+                        "explanation": "A análise heurística não permite extração de frases específicas"
+                    }
+                ],
+                "cv_design_tips": {
+                    "layout": "Manter estrutura clara com secções bem definidas",
+                    "typography": "Usar fontes profissionais como Arial, Calibri ou Helvetica",
+                    "spacing": "Margens de 2-2.5cm, espaçamento 1.15",
+                    "sections_order": "Resumo > Experiência > Formação > Competências",
+                    "length": "1-2 páginas máximo",
+                    "visual_elements": "Evitar gráficos excessivos, manter design limpo"
+                },
+                "writing_guide": {
+                    "power_verbs": ["Liderei", "Implementei", "Otimizei", "Desenvolvi", "Geri", "Coordenei", "Alcancei", "Reduzi", "Aumentei", "Transformei"],
+                    "keywords_to_add": ["Análise específica necessária"],
+                    "phrases_to_avoid": ["Responsável por", "Ajudei a", "Participei em", "Fiz parte de", "Trabalhei com"],
+                    "quantification_tips": "Adicionar números, percentagens e valores sempre que possível"
+                },
+                "professional_development": {
+                    "short_term": [{"action": "Reanalisar CV com sistema AI", "expected_impact": "Obter recomendações específicas", "resources": "Share2Inspire CV Analyzer"}],
+                    "medium_term": [{"action": "A definir após análise completa", "expected_impact": "A determinar", "resources": "A identificar"}],
+                    "long_term": [{"action": "A definir após análise completa", "expected_impact": "A determinar", "resources": "A identificar"}]
+                },
+                "networking_strategy": {
+                    "linkedin_optimization": "Otimizar perfil com keywords da função alvo",
+                    "key_communities": ["LinkedIn Groups da área"],
+                    "events_to_attend": ["Conferências do setor"],
+                    "thought_leadership": "Partilhar conteúdo relevante regularmente"
+                },
+                "salary_positioning": {
+                    "market_range": "Análise específica requer processamento AI",
+                    "negotiation_leverage": "A identificar após análise completa",
+                    "gaps_to_address": "A determinar"
+                }
+            }
         }
 
-
-    # --- Heuristic Helpers (Mantidos) ---
+    # --- Heuristic Helpers ---
     def _score_structure(self, text):
         score = 10
         found_sections = sum(1 for keys in self.sections.values() if any(k in text for k in keys))
@@ -290,4 +408,3 @@ class CVAnalyzer:
 
     def _score_branding(self, text):
         return 10 + (5 if any(k in text for k in self.sections["summary"]) else 0)
-

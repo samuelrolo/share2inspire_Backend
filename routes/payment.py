@@ -234,13 +234,13 @@ def create_mbway_payment(data):
             'error': f"Erro interno: {str(e)}"
         }
 
-def check_mbway_payment_status(order_id, mb_way_key=None):
+def check_mbway_payment_status(request_id, mb_way_key=None):
     """
     Verifica o status de um pagamento MB WAY via API Ifthenpay.
-    Usado para verificação manual antes do webhook estar ativo.
+    IMPORTANTE: A API Ifthenpay usa requestId (não orderId) para verificar status!
     
     Args:
-        order_id: ID do pedido/transação
+        request_id: RequestId retornado pela API quando o pagamento foi iniciado
         mb_way_key: Chave MB WAY (opcional, usa global se não fornecido)
         
     Returns:
@@ -251,14 +251,15 @@ def check_mbway_payment_status(order_id, mb_way_key=None):
             mb_way_key = IFTHENPAY_MBWAY_KEY
         
         # Endpoint de verificação de status da Ifthenpay
+        # CORRIGIDO: Usar requestId conforme documentação oficial
         status_url = "https://api.ifthenpay.com/spg/payment/mbway/status"
         
         params = {
             "mbWayKey": mb_way_key,
-            "orderId": order_id
+            "requestId": request_id  # CORRIGIDO: era orderId, agora é requestId
         }
         
-        logger.info(f"[STATUS CHECK] Verificando pagamento: {order_id}")
+        logger.info(f"[STATUS CHECK] Verificando pagamento com requestId: {request_id}")
         
         response = requests.get(
             status_url,
@@ -273,25 +274,28 @@ def check_mbway_payment_status(order_id, mb_way_key=None):
             result = response.json()
             
             # Mapear status da Ifthenpay
+            # Conforme documentação: "000" = Pending, outros valores indicam conclusão
             status_code = result.get('Status', '')
+            message = result.get('Message', '')
             
-            # Status codes comuns:
-            # "000" = Pending (aguardando confirmação)
-            # "PAGO" ou "SUCCESS" = Paid
-            # "REJECTED" = Rejected
-            # "EXPIRED" = Expired
+            # Status codes conforme documentação Ifthenpay:
+            # "000" = Pending (aguardando confirmação do utilizador)
+            # Qualquer outro código com Message "Success" = Pago
+            # "REJECTED" ou similar = Rejeitado
             
-            is_paid = status_code in ['PAGO', 'SUCCESS', '1']
-            is_pending = status_code in ['000', 'PENDING', '0']
+            is_paid = (status_code != '000' and message.lower() == 'success') or status_code in ['PAGO', 'SUCCESS', '1']
+            is_pending = status_code == '000'
+            
+            logger.info(f"[STATUS CHECK] Status: {status_code}, Message: {message}, isPaid: {is_paid}, isPending: {is_pending}")
             
             return {
                 'success': True,
-                'orderId': order_id,
+                'requestId': request_id,
                 'status': status_code,
                 'isPaid': is_paid,
                 'isPending': is_pending,
                 'amount': result.get('Amount'),
-                'message': result.get('Message', ''),
+                'message': message,
                 'rawResponse': result
             }
         else:
@@ -619,17 +623,55 @@ def webhook_mbway():
         # Still return 200 to avoid infinite retries
         return Response("Error processed", status=200)
 
+def deliver_report_for_order(order_id, record):
+    """
+    Função helper para entregar relatório quando pagamento é confirmado.
+    """
+    try:
+        analysis_data = record.get('analysis_data')
+        user_data = record.get('user_data')
+        
+        if not analysis_data or not user_data:
+            logger.error(f"[DELIVER] Dados incompletos para orderId: {order_id}")
+            return {'success': False, 'error': 'Dados incompletos'}
+        
+        # Import aqui para evitar circular dependency
+        from routes.services import deliver_report_internal
+        
+        result = deliver_report_internal(
+            order_id=order_id,
+            analysis_data=analysis_data,
+            user_data=user_data
+        )
+        
+        if result.get('success'):
+            datastore_client.mark_as_delivered(order_id)
+            logger.info(f"[DELIVER] Relatório entregue com sucesso para orderId: {order_id}")
+        else:
+            logger.error(f"[DELIVER] Erro ao entregar relatório: {result.get('error')}")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"[DELIVER] Erro: {str(e)}")
+        return {'success': False, 'error': str(e)}
+
+
 @payment_bp.route('/status/<order_id>', methods=['GET', 'OPTIONS'])
 def check_payment_status(order_id):
-    """Verifica status de pagamento via API Ifthenpay e Datastore"""
+    """
+    Verifica status de pagamento via API Ifthenpay e Datastore.
+    CORRIGIDO: Agora usa requestId (não orderId) para verificar na API Ifthenpay.
+    """
     if request.method == 'OPTIONS':
         return handle_cors_preflight()
     
     try:
-        logger.info(f"[STATUS] Verificando pagamento: {order_id}")
+        logger.info(f"[STATUS] Verificando pagamento para orderId: {order_id}")
         
         # Primeiro verificar no Datastore local
         record = datastore_client.get_payment_record(order_id)
+        
         if record and record.get('paid'):
             logger.info(f"[STATUS] Pagamento encontrado no Datastore como PAGO")
             response = jsonify({
@@ -641,20 +683,45 @@ def check_payment_status(order_id):
             response.headers.add('Access-Control-Allow-Origin', '*')
             return response
         
-        # Se não está pago no Datastore, verificar na API Ifthenpay
-        logger.info(f"[STATUS] Verificando na API Ifthenpay...")
-        ifthenpay_status = check_mbway_payment_status(order_id)
+        # Obter requestId do record (guardado quando o pagamento foi iniciado)
+        request_id = None
+        if record:
+            payment_data = record.get('payment_data', {})
+            request_id = payment_data.get('requestId')
+            logger.info(f"[STATUS] RequestId encontrado no Datastore: {request_id}")
+        
+        if not request_id:
+            logger.warning(f"[STATUS] RequestId não encontrado para orderId: {order_id}")
+            response = jsonify({
+                'success': True,
+                'paid': False,
+                'pending': True,
+                'status': 'PENDING',
+                'message': 'RequestId não encontrado. Aguardando confirmação via webhook.'
+            })
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response
+        
+        # Verificar na API Ifthenpay usando requestId (NÃO orderId!)
+        logger.info(f"[STATUS] Verificando na API Ifthenpay com requestId: {request_id}")
+        ifthenpay_status = check_mbway_payment_status(request_id)
         
         if ifthenpay_status.get('success'):
             is_paid = ifthenpay_status.get('isPaid', False)
             is_pending = ifthenpay_status.get('isPending', True)
             
-            logger.info(f"[STATUS] Ifthenpay - isPaid: {is_paid}, isPending: {is_pending}")
+            logger.info(f"[STATUS] Ifthenpay - isPaid: {is_paid}, isPending: {is_pending}, status: {ifthenpay_status.get('status')}")
             
-            # Se está pago na Ifthenpay, atualizar Datastore
+            # Se está pago na Ifthenpay, atualizar Datastore e entregar relatório
             if is_paid:
                 datastore_client.update_payment_status(order_id, 'PAID', paid=True)
-                logger.info(f"[STATUS] Pagamento confirmado como PAGO")
+                logger.info(f"[STATUS] Pagamento confirmado como PAGO para orderId: {order_id}")
+                
+                # Disparar entrega do relatório
+                try:
+                    deliver_report_for_order(order_id, record)
+                except Exception as delivery_error:
+                    logger.error(f"[STATUS] Erro ao entregar relatório: {str(delivery_error)}")
             
             response = jsonify({
                 'success': True,
@@ -681,6 +748,7 @@ def check_payment_status(order_id):
             
     except Exception as e:
         logger.error(f"[STATUS] Erro ao verificar status: {str(e)}")
+        logger.error(traceback.format_exc())
         response = jsonify({'success': False, 'error': str(e)})
         response.headers.add('Access-Control-Allow-Origin', '*')
         return response, 500
@@ -690,7 +758,7 @@ def check_payment_status(order_id):
 def check_payment_status_and_deliver():
     """
     TEMPORARY ENDPOINT: Verifica status do pagamento via API Ifthenpay e entrega relatório se pago.
-    Usado até webhook estar ativo.
+    CORRIGIDO: Agora usa requestId (não orderId) para verificar na API Ifthenpay.
     
     Query params:
         orderId: ID do pedido (requerido)
@@ -708,7 +776,7 @@ def check_payment_status_and_deliver():
                 'error': 'orderId é obrigatório'
             }), 400
         
-        logger.info(f"[MANUAL CHECK] Verificação manual solicitada para: {order_id}")
+        logger.info(f"[MANUAL CHECK] Verificação manual solicitada para orderId: {order_id}")
         
         # 1. Verificar se já foi entregue
         if datastore_client.is_delivered(order_id):
@@ -718,8 +786,32 @@ def check_payment_status_and_deliver():
                 'message': 'Relatório já foi entregue anteriormente'
             }), 200
         
-        # 2. Verificar status na Ifthenpay
-        status_result = check_mbway_payment_status(order_id)
+        # 2. Recuperar dados do Datastore para obter requestId
+        record = datastore_client.get_payment_record(order_id)
+        
+        if not record:
+            return jsonify({
+                'success': False,
+                'error': 'Dados do pedido não encontrados'
+            }), 404
+        
+        # Obter requestId do payment_data (guardado quando o pagamento foi iniciado)
+        payment_data = record.get('payment_data', {})
+        request_id = payment_data.get('requestId')
+        
+        if not request_id:
+            logger.warning(f"[MANUAL CHECK] RequestId não encontrado para orderId: {order_id}")
+            return jsonify({
+                'success': True,
+                'paid': False,
+                'pending': True,
+                'message': 'RequestId não encontrado. Aguardando confirmação via webhook.'
+            }), 200
+        
+        logger.info(f"[MANUAL CHECK] Verificando status com requestId: {request_id}")
+        
+        # 3. Verificar status na Ifthenpay usando requestId (NÃO orderId!)
+        status_result = check_mbway_payment_status(request_id)
         
         if not status_result.get('success'):
             return jsonify({
@@ -728,18 +820,12 @@ def check_payment_status_and_deliver():
                 'details': status_result.get('error')
             }), 500
         
-        # 3. Verificar se está pago
+        # 4. Verificar se está pago
         if status_result.get('isPaid'):
-            logger.info(f"[MANUAL CHECK] Pagamento confirmado para: {order_id}")
+            logger.info(f"[MANUAL CHECK] Pagamento confirmado para orderId: {order_id}")
             
-            # Recuperar dados do Datastore
-            record = datastore_client.get_payment_record(order_id)
-            
-            if not record:
-                return jsonify({
-                    'success': False,
-                    'error': 'Dados do pedido não encontrados'
-                }), 404
+            # Atualizar status no Datastore
+            datastore_client.update_payment_status(order_id, 'PAID', paid=True)
             
             # Entregar relatório automaticamente
             analysis_data = record.get('analysis_data')
