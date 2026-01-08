@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify
 import os
 import json
+import matplotlib.pyplot as plt
+import numpy as np
 import logging
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
@@ -467,7 +469,27 @@ def deliver_report():
 
         # 2. SUCCESS CHECKLIST & PDF GENERATION
         generator = ReportPDFGenerator()
-        pdf_bytes, status = generator.create_pdf(report_data)
+        # Generate radar chart
+        radar_scores = {
+            "Estrutura": report_data["executive_summary"]["global_score_breakdown"]["structure_clarity"],
+            "Conteúdo": report_data["executive_summary"]["global_score_breakdown"]["content_relevance"],
+            "ATS": report_data["executive_summary"]["global_score_breakdown"]["ats_compatibility"],
+            "Impacto": report_data["executive_summary"]["global_score_breakdown"]["impact_results"],
+            "Marca Pessoal": report_data["executive_summary"]["global_score_breakdown"]["personal_brand"],
+            "Riscos": report_data["executive_summary"]["global_score_breakdown"]["risks_inconsistencies"]
+        }
+        
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_radar:
+            radar_chart_path = tmp_radar.name
+            create_radar_chart(radar_scores, radar_chart_path)
+
+        pdf_bytes, status = generator.create_pdf(report_data, radar_chart_path=radar_chart_path)
+        
+        # Clean up temporary radar chart file
+        os.unlink(radar_chart_path)
         
         # System Rule: PDF must exist, >50KB, >=5 pages
         if status != "OK":
@@ -605,3 +627,19 @@ def kickstart_confirm():
     except Exception as e:
         print(f"Erro Kickstart Confirm: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+def create_radar_chart(scores, output_path):
+    labels = list(scores.keys())
+    stats = list(scores.values())
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
+    stats = np.concatenate((stats,[stats[0]]))
+    angles += angles[:1]
+
+    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+    ax.fill(angles, stats, color=\"gold\", alpha=0.25)
+    ax.plot(angles, stats, color=\"gold\", linewidth=2)
+    ax.set_yticklabels([])
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels)
+    plt.savefig(output_path)
+    plt.close(fig)
