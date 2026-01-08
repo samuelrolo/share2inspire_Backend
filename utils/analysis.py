@@ -4,7 +4,7 @@ import json
 import os
 import io
 from PyPDF2 import PdfReader
-import google.generativeai as genai
+import google.genai as genai
 from utils.secrets import get_secret
 
 class CVAnalyzer:
@@ -254,8 +254,7 @@ class CVAnalyzer:
             Função Alvo: {role}
             """
 
-            # Gerar o conteúdo
-            response = self.model.generate_content(prompt, uploaded_file)
+            # Gerar o conteúd            response = self.model.generate_content(contents=[prompt, uploaded_file])
             
             # Limpar e extrair o JSON
             cleaned_text = response.text.strip().replace("```json", "").replace("```", "")
