@@ -621,26 +621,69 @@ def webhook_mbway():
 
 @payment_bp.route('/status/<order_id>', methods=['GET', 'OPTIONS'])
 def check_payment_status(order_id):
-    """Verifica status de pagamento no Datastore (local)"""
+    """Verifica status de pagamento via API Ifthenpay e Datastore"""
     if request.method == 'OPTIONS':
         return handle_cors_preflight()
     
     try:
+        logger.info(f"[STATUS] Verificando pagamento: {order_id}")
+        
+        # Primeiro verificar no Datastore local
         record = datastore_client.get_payment_record(order_id)
-        if record:
-            return jsonify({
+        if record and record.get('paid'):
+            logger.info(f"[STATUS] Pagamento encontrado no Datastore como PAGO")
+            response = jsonify({
                 'success': True,
+                'paid': True,
+                'status': 'PAID',
                 'record': record
             })
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response
+        
+        # Se não está pago no Datastore, verificar na API Ifthenpay
+        logger.info(f"[STATUS] Verificando na API Ifthenpay...")
+        ifthenpay_status = check_mbway_payment_status(order_id)
+        
+        if ifthenpay_status.get('success'):
+            is_paid = ifthenpay_status.get('isPaid', False)
+            is_pending = ifthenpay_status.get('isPending', True)
+            
+            logger.info(f"[STATUS] Ifthenpay - isPaid: {is_paid}, isPending: {is_pending}")
+            
+            # Se está pago na Ifthenpay, atualizar Datastore
+            if is_paid:
+                datastore_client.update_payment_status(order_id, 'PAID', paid=True)
+                logger.info(f"[STATUS] Pagamento confirmado como PAGO")
+            
+            response = jsonify({
+                'success': True,
+                'paid': is_paid,
+                'pending': is_pending,
+                'status': 'PAID' if is_paid else ('PENDING' if is_pending else 'UNKNOWN'),
+                'ifthenpayStatus': ifthenpay_status.get('status'),
+                'message': ifthenpay_status.get('message', '')
+            })
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response
         else:
-            return jsonify({
-                'success': False,
-                'error': 'Pagamento não encontrado'
-            }), 404
+            # Erro ao verificar na Ifthenpay, retornar status pendente
+            logger.warning(f"[STATUS] Erro ao verificar na Ifthenpay: {ifthenpay_status.get('error')}")
+            response = jsonify({
+                'success': True,
+                'paid': False,
+                'pending': True,
+                'status': 'PENDING',
+                'message': 'Aguardando confirmação'
+            })
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response
             
     except Exception as e:
-        logger.error(f"Erro ao verificar status: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logger.error(f"[STATUS] Erro ao verificar status: {str(e)}")
+        response = jsonify({'success': False, 'error': str(e)})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response, 500
 
 
 @payment_bp.route('/check-payment-status', methods=['GET', 'POST', 'OPTIONS'])
