@@ -58,7 +58,8 @@ class CVAnalyzer:
             print("[DEBUG] Model is None in analyze method. Attempting re-initialization.")
             if self.api_key:
                 try:
-                    genai.configure(api_key=self.api_ke                 self.model = genai.GenerativeModel("gemini-pro")
+                    genai.configure(api_key=self.api_key)
+                    self.model = genai.GenerativeModel("gemini-pro")
                     print("[DEBUG] Gemini model re-initialized successfully in analyze method.")
                 except Exception as e:
                     print(f"[ERROR] Failed to re-initialize Gemini API or model in analyze method: {e}")
