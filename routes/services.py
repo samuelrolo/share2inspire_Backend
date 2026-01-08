@@ -17,6 +17,15 @@ logger = logging.getLogger(__name__)
 
 services_bp = Blueprint("services", __name__)
 
+# Whitelist de emails para bypass de pagamento (testes/admin)
+WHITELIST_EMAILS = [
+    "samuelrolo@gmail.com",
+    "srshare2inspire@gmail.com"
+]
+
+# Sender padrão para emails Brevo
+BREVO_SENDER = {"email": "srshare2inspire@gmail.com", "name": "Share2Inspire"}
+
 # Lazy initialization for Brevo API
 _api_instance = None
 
@@ -352,6 +361,19 @@ def request_report_payment():
         if not all([email, phone]):
             return jsonify({"success": False, "error": "Email e Telemóvel são obrigatórios"}), 400
         
+        # >>> WHITELIST CHECK: Bypass de pagamento para emails de teste/admin <<<
+        if email.lower() in [e.lower() for e in WHITELIST_EMAILS]:
+            print(f"[WHITELIST] Email {email} está na whitelist - bypass de pagamento")
+            return jsonify({
+                "success": True,
+                "message": "Email na whitelist - relatório será enviado automaticamente!",
+                "payment": {"success": True, "status": "whitelist_bypass"},
+                "requestId": f"WL-{name.replace(' ', '')}-{int(datetime.now().timestamp())}",
+                "orderId": f"WL-{name.replace(' ', '')}-{int(datetime.now().timestamp())}",
+                "whitelist": True,
+                "skipPayment": True
+            }), 200
+        
         # >>> 1. Enviar EMAIL 1: Confirmação de Pedido <<<
         data_pedido = datetime.now().strftime('%d/%m/%Y')
         subject_1, body_1 = get_email_confirmacao_pedido(
@@ -363,6 +385,7 @@ def request_report_payment():
         try:
             get_brevo_api().send_transac_email(sib_api_v3_sdk.SendSmtpEmail(
                 to=[{"email": email, "name": name}],
+                sender=BREVO_SENDER,
                 subject=subject_1,
                 html_content=body_1.replace('\n', '<br>')
             ))
@@ -399,6 +422,7 @@ def request_report_payment():
         try:
             get_brevo_api().send_transac_email(sib_api_v3_sdk.SendSmtpEmail(
                 to=[{"email": email, "name": name}],
+                sender=BREVO_SENDER,
                 subject=subject_2,
                 html_content=body_2.replace('\n', '<br>')
             ))
