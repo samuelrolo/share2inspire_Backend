@@ -331,7 +331,7 @@ def analyze_cv():
 @services_bp.route("/request-report-payment", methods=["POST", "OPTIONS"])
 def request_report_payment():
     """
-    CV Analyzer - Request paid report (1€ MB WAY)
+    CV Analyzer - Request paid report (2.99€ MB WAY)
     Called when user clicks "Quero Relatório Personalizado"
     """
     # Tratar pedidos OPTIONS para CORS
@@ -414,7 +414,7 @@ def request_report_payment():
         subject_2, body_2 = get_email_pagamento_mbway(
             nome=name,
             nome_do_servico="CV Analyzer",
-            valor="1€",
+            valor="2.99€",
             prazo_entrega="Imediato (após confirmação)",
             link_pagamento_mbway=payment_link
         )

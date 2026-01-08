@@ -283,7 +283,7 @@ def check_mbway_payment_status(request_id, mb_way_key=None):
             # Qualquer outro código com Message "Success" = Pago
             # "REJECTED" ou similar = Rejeitado
             
-            is_paid = (status_code != '000' and message.lower() == 'success') or status_code in ['PAGO', 'SUCCESS', '1']
+            is_paid = (status_code != '000' and message.lower() == 'success') or status_code in ['PAGO', 'SUCCESS', '2.99']
             is_pending = status_code == '000'
             
             logger.info(f"[STATUS CHECK] Status: {status_code}, Message: {message}, isPaid: {is_paid}, isPending: {is_pending}")
