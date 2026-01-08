@@ -409,7 +409,9 @@ def request_report_payment():
             "success": True,
             "message": "Pedido confirmado! Verifica o teu email e telemóvel para concluir o pagamento.",
             "payment": payment_result,
-            "requestId": payment_result.get('requestId')
+            "requestId": payment_data['orderId'],  # Usar o orderId que enviámos à Ifthenpay para polling
+            "orderId": payment_data['orderId'],
+            "ifthenpayRequestId": payment_result.get('requestId')  # RequestId da Ifthenpay (para referência)
         }), 200
 
     except Exception as e:
