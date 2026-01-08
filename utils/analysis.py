@@ -11,11 +11,18 @@ class CVAnalyzer:
     def __init__(self):
         # Configure Gemini API if key is available
         self.api_key = get_secret("GEMINI_API_KEY")
+        print(f"[DEBUG] API Key retrieved: {bool(self.api_key)}")
         if self.api_key:
-            genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel("gemini-1.5-flash")
+            try:
+                genai.configure(api_key=self.api_key)
+                self.model = genai.GenerativeModel("gemini-1.5-flash")
+                print("[DEBUG] Gemini model initialized successfully.")
+            except Exception as e:
+                print(f"[ERROR] Failed to configure Gemini API or initialize model: {e}")
+                self.model = None
         else:
             self.model = None
+            print("[DEBUG] Gemini API Key not found, model not initialized.")
 
         # Heuristic fallbacks
         self.sections = {
@@ -48,8 +55,15 @@ class CVAnalyzer:
         Generates comprehensive analysis for both screen display and PDF report.
         """
         if not self.model:
+            print("[DEBUG] Model is None in analyze method. Attempting re-initialization.")
             if self.api_key:
-                 self.model = genai.GenerativeModel("gemini-1.5-flash")
+                try:
+                    genai.configure(api_key=self.api_key)
+                    self.model = genai.GenerativeModel("gemini-1.5-flash")
+                    print("[DEBUG] Gemini model re-initialized successfully in analyze method.")
+                except Exception as e:
+                    print(f"[ERROR] Failed to re-initialize Gemini API or model in analyze method: {e}")
+                    self.model = None
             else:
                 return {
                     "error": "Gemini Model not initialized. Check API Key.",
