@@ -456,6 +456,9 @@ def deliver_report():
         
         # 1. Capture Data
         report_json = request.form.get("report")
+        email = request.form.get("email")
+        name = request.form.get("name")
+        
         if not report_json:
             return jsonify({"success": False, "error": "Dados do relatório ausentes"}), 400
         report_data = json.loads(report_json)
@@ -537,8 +540,6 @@ def deliver_report():
         # -----------------------------------------
         
         cv_file = request.files.get("cv_file")
-        email = request.form.get("email")
-        name = request.form.get("name")
         
         if not all([cv_file, email, name]):
             return jsonify({"success": False, "error": "Ficheiro original ou dados de contacto ausentes"}), 400
