@@ -473,10 +473,10 @@ def deliver_report():
         radar_scores = {
             "Estrutura": report_data["executive_summary"]["global_score_breakdown"]["structure_clarity"],
             "Conteúdo": report_data["executive_summary"]["global_score_breakdown"]["content_relevance"],
+            "Consistência": report_data["executive_summary"]["global_score_breakdown"]["risks_inconsistencies"],
             "ATS": report_data["executive_summary"]["global_score_breakdown"]["ats_compatibility"],
             "Impacto": report_data["executive_summary"]["global_score_breakdown"]["impact_results"],
-            "Marca Pessoal": report_data["executive_summary"]["global_score_breakdown"]["personal_brand"],
-            "Riscos": report_data["executive_summary"]["global_score_breakdown"]["risks_inconsistencies"]
+            "Marca Pessoal": report_data["executive_summary"]["global_score_breakdown"]["personal_brand"]
         }
         
         import tempfile
@@ -636,8 +636,8 @@ def create_radar_chart(scores, output_path):
     angles += angles[:1]
 
     fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
-    ax.fill(angles, stats, color=\"gold\", alpha=0.25)
-    ax.plot(angles, stats, color=\"gold\", linewidth=2)
+    ax.fill(angles, stats, color="#BF9A33", alpha=0.25)
+    ax.plot(angles, stats, color="#BF9A33", linewidth=2)
     ax.set_yticklabels([])
     ax.set_xticks(angles[:-1])
     ax.set_xticklabels(labels)
