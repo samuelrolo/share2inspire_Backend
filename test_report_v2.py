@@ -386,22 +386,22 @@ Esta certificação posiciona o candidato na vanguarda da evolução da profiss�
         
         "phrase_improvements": [
             {
+                "category": "Descrição de Responsabilidades",
                 "original": "Responsável pela gestão de processos de RH e implementação de melhorias",
-                "problem": """Esta frase exemplifica uma abordagem descritiva focada em responsabilidades que não comunica valor ou impacto. A utilização de 'responsável por' é uma construção passiva que não evidencia ação ou resultado. 'Gestão de processos' e 'implementação de melhorias' são termos genéricos que poderiam aplicar-se a qualquer profissional da área, não diferenciando o candidato.""",
                 "improved": "Redesenhei 12 processos core de RH, reduzindo tempo de ciclo em 35% e eliminando €180K em custos operacionais anuais através de automação e otimização de workflows",
-                "explanation": """A versão melhorada transforma uma descrição genérica numa afirmação de impacto quantificável. A utilização de verbo de ação forte ('redesenhei'), números específicos ('12 processos', '35%', '€180K'), e resultados concretos ('reduzindo', 'eliminando') comunica valor de forma imediata e memorável. Esta construção responde às expectativas de recrutadores que procuram evidência de capacidade de entrega."""
+                "explanation": "Verbo de ação forte, números específicos e resultados concretos comunicam valor de forma imediata e memorável."
             },
             {
+                "category": "Liderança e Gestão de Stakeholders",
                 "original": "Liderança de equipa e gestão de stakeholders em projetos de transformação",
-                "problem": """A frase apresenta competências relevantes mas de forma vaga e não diferenciadora. 'Liderança de equipa' e 'gestão de stakeholders' são expectativas básicas para funções de gestão, não constituindo fatores de distinção. A ausência de contexto específico ou resultados torna a afirmação pouco memorável.""",
                 "improved": "Liderei equipa multidisciplinar de 8 elementos e coordenei 15+ stakeholders C-level na implementação de HRIS que serviu 5.000 colaboradores em 6 países, entregue 2 meses antes do prazo e 15% abaixo do orçamento",
-                "explanation": """A reformulação adiciona dimensão ('8 elementos', '15+ stakeholders', '5.000 colaboradores', '6 países'), nível de senioridade dos stakeholders ('C-level'), e métricas de sucesso ('2 meses antes', '15% abaixo'). Esta densidade de informação específica demonstra escala de responsabilidade e capacidade de entrega em contextos complexos."""
+                "explanation": "Dimensão, nível de senioridade dos stakeholders e métricas de sucesso demonstram escala de responsabilidade."
             },
             {
+                "category": "Transformação Digital",
                 "original": "Experiência em transformação digital e otimização de processos de RH",
-                "problem": """Esta construção é uma etiqueta genérica que não comunica profundidade ou especificidade. 'Experiência em' é uma formulação fraca que não demonstra nível de competência ou resultados. Muitos candidatos poderiam fazer afirmações semelhantes, tornando-a não diferenciadora.""",
                 "improved": "Arquitetei e executei roadmap de transformação digital de RH em 3 fases, digitalizando 100% dos processos administrativos, implementando self-service para 3.000 colaboradores, e aumentando NPS interno de 45 para 78 pontos",
-                "explanation": """A versão otimizada demonstra liderança estratégica ('arquitetei'), execução ('executei'), escala ('3.000 colaboradores'), e impacto mensurável ('NPS de 45 para 78'). A estrutura em fases sugere abordagem metodológica, enquanto os resultados específicos evidenciam capacidade de transformar visão em realidade."""
+                "explanation": "Liderança estratégica, execução, escala e impacto mensurável evidenciam capacidade de transformar visão em realidade."
             }
         ],
         

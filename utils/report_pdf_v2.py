@@ -136,7 +136,7 @@ class ReportPDFGenerator:
     <style>
         @page {
             size: A4;
-            margin: 1.5cm;
+            margin: 1.5cm 1.5cm 2.5cm 1.5cm;
         }
         
         body {
@@ -193,12 +193,17 @@ class ReportPDFGenerator:
         .dimension-analysis { font-size: 9.5pt; color: #495057; padding: 0 5pt; }
         .dimension-focus { font-size: 9pt; color: #6c757d; margin-top: 6pt; padding: 8pt; background: #f8f9fa; border-left: 2pt solid #BF9A33; }
         
-        /* Before/After */
-        .before-after { margin: 12pt 0; padding: 12pt; background: #f8f9fa; border-left: 3pt solid #BF9A33; }
-        .ba-label { font-size: 8pt; font-weight: bold; text-transform: uppercase; margin-bottom: 4pt; }
-        .ba-before { color: #e74c3c; }
-        .ba-after { color: #27ae60; }
-        .ba-text { font-style: italic; color: #495057; font-size: 10pt; margin-bottom: 8pt; padding: 6pt; background: #FFFFFF; border: 1pt solid #e9ecef; }
+        /* Before/After - Novo Layout */
+        .example-item { margin-bottom: 15pt; padding-bottom: 15pt; border-bottom: 1pt solid #e9ecef; page-break-inside: avoid; }
+        .example-item:last-child { border-bottom: none; }
+        .example-title { font-size: 11pt; font-weight: bold; color: #BF9A33; margin-bottom: 10pt; }
+        .example-columns { width: 100%; }
+        .example-columns td { width: 50%; vertical-align: top; padding: 5pt; }
+        .ba-label { font-size: 9pt; font-weight: bold; color: #1A1A1A; margin-bottom: 4pt; }
+        .ba-text { font-style: italic; color: #495057; font-size: 9.5pt; padding: 8pt; background: #f8f9fa; border: 1pt solid #e9ecef; }
+        .racional-section { margin-top: 10pt; }
+        .racional-label { font-size: 9pt; font-weight: bold; color: #1A1A1A; margin-bottom: 4pt; }
+        .racional-text { font-size: 9pt; color: #495057; text-align: justify; }
         
         /* Certification */
         .cert-item { margin-bottom: 12pt; padding: 10pt; border: 1pt solid #e9ecef; }
@@ -223,7 +228,12 @@ class ReportPDFGenerator:
         .service-link { font-size: 9pt; color: #BF9A33; font-weight: bold; margin-top: 8pt; }
         
         /* Footer */
-        .page-footer { font-size: 8pt; color: #adb5bd; text-align: center; border-top: 1pt solid #e9ecef; padding-top: 10pt; margin-top: 20pt; }
+        .page-footer { position: fixed; bottom: 0; left: 0; right: 0; font-size: 7pt; color: #adb5bd; padding: 8pt 0; }
+        .page-footer-table { width: 100%; border-collapse: collapse; }
+        .page-footer-table td { padding: 0; }
+        .footer-left { text-align: left; }
+        .footer-center { text-align: center; }
+        .footer-right { text-align: right; }
         
         /* Clear float */
         .clearfix { clear: both; }
@@ -516,15 +526,26 @@ class ReportPDFGenerator:
 <h2>Exemplos de Melhoria de Frases</h2>
 
 {% for item in analysis.pdf_extended_content.phrase_improvements %}
-<div class="before-after">
-    <div class="ba-label ba-before">Antes (Original)</div>
-    <div class="ba-text">"{{ item.original }}"</div>
+<div class="example-item">
+    <div class="example-title">{{ loop.index }}. {{ item.category | default('Melhoria de Frase') }}</div>
     
-    <div class="ba-label ba-after">Depois (Otimizado)</div>
-    <div class="ba-text">"{{ item.improved }}"</div>
+    <table class="example-columns">
+        <tr>
+            <td>
+                <div class="ba-label">Antes</div>
+                <div class="ba-text">"{{ item.original }}"</div>
+            </td>
+            <td>
+                <div class="ba-label">Depois</div>
+                <div class="ba-text">"{{ item.improved }}"</div>
+            </td>
+        </tr>
+    </table>
     
-    <h4 class="text-gold">Justificação da Melhoria</h4>
-    <p style="font-size: 9.5pt;">{{ item.explanation }}</p>
+    <div class="racional-section">
+        <div class="racional-label">Racional</div>
+        <div class="racional-text">{{ item.explanation }}</div>
+    </div>
 </div>
 {% endfor %}
 
@@ -650,7 +671,13 @@ class ReportPDFGenerator:
 </div>
 
 <div class="page-footer">
-    Relatório de Análise de CV - Share2Inspire | Privado e Confidencial | {{ report_id }}
+    <table class="page-footer-table">
+        <tr>
+            <td class="footer-left">{{ candidate_name }}</td>
+            <td class="footer-center">Relatório de Análise de CV</td>
+            <td class="footer-right">Share2Inspire | share2inspire.pt</td>
+        </tr>
+    </table>
 </div>
 
 </body>
