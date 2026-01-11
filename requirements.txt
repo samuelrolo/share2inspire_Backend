@@ -31,3 +31,4 @@ PyPDF2
 google-cloud-aiplatform
 xhtml2pdf
 matplotlib==3.8.2
+cairosvg==2.8.2

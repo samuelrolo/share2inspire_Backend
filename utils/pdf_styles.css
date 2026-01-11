@@ -1,0 +1,73 @@
+body {
+    font-family: 'Helvetica', 'Arial', sans-serif;
+    color: #333;
+    line-height: 1.6;
+}
+h1, h2, h3 {
+    color: #1a1a1a;
+    font-weight: bold;
+}
+h1 {
+    font-size: 24px;
+    border-bottom: 2px solid #d4af37; /* Gold */
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+h2 {
+    font-size: 20px;
+    color: #d4af37; /* Gold */
+    margin-top: 30px;
+}
+h3 {
+    font-size: 16px;
+    margin-top: 20px;
+    border-left: 3px solid #d4af37; /* Gold */
+    padding-left: 10px;
+}
+p, li {
+    font-size: 12px;
+}
+ul {
+    list-style-type: disc;
+    padding-left: 20px;
+}
+.scorecard {
+    text-align: center;
+    margin: 20px 0;
+}
+.scorecard img {
+    width: 150px;
+    height: 150px;
+}
+.mini-scorecard {
+    display: inline-block;
+    width: 80px;
+    margin: 10px;
+}
+.mini-scorecard img {
+    width: 80px;
+    height: 80px;
+}
+.radar-chart {
+    text-align: center;
+    margin: 30px 0;
+}
+.radar-chart img {
+    width: 100%;
+    max-width: 500px;
+}
+.progress-bar {
+    width: 100%;
+    background-color: #f0f0f0;
+    border-radius: 5px;
+    margin: 10px 0;
+}
+.progress-bar div {
+    height: 20px;
+    background-color: #d4af37; /* Gold */
+    border-radius: 5px;
+    text-align: right;
+    color: white;
+    padding-right: 5px;
+    line-height: 20px;
+}
