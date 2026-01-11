@@ -76,10 +76,11 @@ REGRAS FUNDAMENTAIS DE QUALIDADE (OBRIGATÓRIAS)
 
 1. FORMATO DE ANÁLISE ESTRUTURADA:
    - Cada campo de análise DEVE usar formato de BULLETS organizados por subtemas
-   - Cada bullet deve ter 2-3 frases com insight específico e açionável
+   - Cada bullet deve ter 1-2 frases com insight específico e açionável
    - Usar **negrito** para destacar os conceitos-chave em cada bullet
-   - Organizar bullets por categorias temáticas (ex: "Pontos Fortes:", "Áreas de Melhoria:", "Recomendações:")
-   - Mínimo de 6-8 bullets por campo de análise, cada um com profundidade
+   - Organizar bullets por categorias temáticas (ex: "Pontos Fortes:", "Áreas de Melhoria:")
+   - MÁXIMO de 4-5 bullets por campo de análise para garantir que cabe numa página
+   - LIMITE ABSOLUTO: cada campo de análise não pode exceder 150 palavras
 
 2. CONTEÚDO COM VALOR REAL:
    - Desenvolver cada ponto com exemplos concretos e implicações práticas

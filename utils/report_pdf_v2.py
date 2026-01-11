@@ -148,7 +148,7 @@ class ReportPDFGenerator:
         
         h1 { font-size: 24pt; font-weight: bold; color: #1A1A1A; margin: 0 0 10pt 0; }
         h2 { font-size: 14pt; font-weight: bold; color: #1A1A1A; margin: 20pt 0 10pt 0; border-left: 3pt solid #BF9A33; padding-left: 10pt; }
-        h3 { font-size: 11pt; font-weight: bold; color: #BF9A33; margin: 15pt 0 6pt 0; page-break-after: avoid; page-break-inside: avoid; }
+        h3 { font-size: 11pt; font-weight: bold; color: #BF9A33; margin: 15pt 0 6pt 0; page-break-after: avoid; }
         h4 { font-size: 10pt; font-weight: bold; color: #1A1A1A; margin: 10pt 0 4pt 0; }
         
         p { margin: 0 0 8pt 0; text-align: justify; }
@@ -309,37 +309,41 @@ class ReportPDFGenerator:
     </tr>
 </table>
 
-<!-- SCORECARD PRINCIPAL -->
-<div class="scorecard-container">
-    <img src="{{ main_scorecard }}" width="180" alt="Score Global">
-</div>
-
-<!-- ANÁLISE GLOBAL: PONTOS FORTES E OPORTUNIDADES -->
-<table style="width: 100%; margin: 15pt 0; border-collapse: collapse;">
+<!-- SCORECARD E ANÁLISE GLOBAL LADO A LADO -->
+<table style="width: 100%; margin: 10pt 0; border-collapse: collapse;">
     <tr>
-        <td style="width: 50%; vertical-align: top; padding-right: 15pt;">
-            <div style="font-size: 10pt; font-weight: bold; color: #BF9A33; margin-bottom: 8pt; border-bottom: 1pt solid #BF9A33; padding-bottom: 4pt;">Pontos Fortes</div>
-            <ul style="font-size: 9pt; color: #333333; margin: 0; padding-left: 15pt; line-height: 1.5;">
-            {% for ponto in analysis.global_summary.strengths[:4] %}
-                <li style="margin-bottom: 5pt;">{{ ponto }}</li>
-            {% else %}
-                <li style="margin-bottom: 5pt;">Trajetória profissional consistente com progressão clara</li>
-                <li style="margin-bottom: 5pt;">Experiência em organizações de referência no setor</li>
-                <li style="margin-bottom: 5pt;">Formação académica alinhada com a área de atuação</li>
-            {% endfor %}
-            </ul>
+        <td style="width: 35%; vertical-align: top; text-align: center;">
+            <img src="{{ main_scorecard }}" width="140" alt="Score Global">
         </td>
-        <td style="width: 50%; vertical-align: top; padding-left: 15pt;">
-            <div style="font-size: 10pt; font-weight: bold; color: #1A1A1A; margin-bottom: 8pt; border-bottom: 1pt solid #1A1A1A; padding-bottom: 4pt;">Oportunidades de Melhoria</div>
-            <ul style="font-size: 9pt; color: #333333; margin: 0; padding-left: 15pt; line-height: 1.5;">
-            {% for oportunidade in analysis.global_summary.improvements[:4] %}
-                <li style="margin-bottom: 5pt;">{{ oportunidade }}</li>
-            {% else %}
-                <li style="margin-bottom: 5pt;">Quantificar resultados com métricas de impacto</li>
-                <li style="margin-bottom: 5pt;">Reforçar keywords para otimização ATS</li>
-                <li style="margin-bottom: 5pt;">Articular proposta de valor diferenciadora</li>
-            {% endfor %}
-            </ul>
+        <td style="width: 65%; vertical-align: top;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="width: 50%; vertical-align: top; padding-right: 10pt;">
+                        <div style="font-size: 9pt; font-weight: bold; color: #BF9A33; margin-bottom: 6pt; border-bottom: 1pt solid #BF9A33; padding-bottom: 3pt;">Pontos Fortes</div>
+                        <ul style="font-size: 8pt; color: #333333; margin: 0; padding-left: 12pt; line-height: 1.4;">
+                        {% for ponto in analysis.global_summary.strengths[:4] %}
+                            <li style="margin-bottom: 4pt;">{{ ponto }}</li>
+                        {% else %}
+                            <li style="margin-bottom: 4pt;">Trajetória profissional consistente</li>
+                            <li style="margin-bottom: 4pt;">Experiência em organizações de referência</li>
+                            <li style="margin-bottom: 4pt;">Formação académica alinhada</li>
+                        {% endfor %}
+                        </ul>
+                    </td>
+                    <td style="width: 50%; vertical-align: top; padding-left: 10pt;">
+                        <div style="font-size: 9pt; font-weight: bold; color: #1A1A1A; margin-bottom: 6pt; border-bottom: 1pt solid #1A1A1A; padding-bottom: 3pt;">Oportunidades de Melhoria</div>
+                        <ul style="font-size: 8pt; color: #333333; margin: 0; padding-left: 12pt; line-height: 1.4;">
+                        {% for oportunidade in analysis.global_summary.improvements[:4] %}
+                            <li style="margin-bottom: 4pt;">{{ oportunidade }}</li>
+                        {% else %}
+                            <li style="margin-bottom: 4pt;">Quantificar resultados com métricas</li>
+                            <li style="margin-bottom: 4pt;">Reforçar keywords para ATS</li>
+                            <li style="margin-bottom: 4pt;">Articular proposta de valor</li>
+                        {% endfor %}
+                        </ul>
+                    </td>
+                </tr>
+            </table>
         </td>
     </tr>
 </table>
@@ -525,7 +529,7 @@ class ReportPDFGenerator:
 
 <h2>Exemplos de Melhoria de Frases</h2>
 
-{% for item in analysis.pdf_extended_content.phrase_improvements %}
+{% for item in analysis.phrase_improvements %}
 <div class="example-item">
     <div class="example-title">{{ loop.index }}. {{ item.category | default('Melhoria de Frase') }}</div>
     
@@ -533,18 +537,18 @@ class ReportPDFGenerator:
         <tr>
             <td>
                 <div class="ba-label">Antes</div>
-                <div class="ba-text">"{{ item.original }}"</div>
+                <div class="ba-text">"{{ item.before }}"</div>
             </td>
             <td>
                 <div class="ba-label">Depois</div>
-                <div class="ba-text">"{{ item.improved }}"</div>
+                <div class="ba-text">"{{ item.after }}"</div>
             </td>
         </tr>
     </table>
     
     <div class="racional-section">
         <div class="racional-label">Racional</div>
-        <div class="racional-text">{{ item.explanation }}</div>
+        <div class="racional-text">{{ item.justification }}</div>
     </div>
 </div>
 {% endfor %}
@@ -736,7 +740,7 @@ class ReportPDFGenerator:
         return svg
 
     def generate_bar_chart(self, radar_data):
-        """Gera um gráfico de barras horizontais SVG elegante."""
+        """Gera um gráfico de barras horizontais SVG elegante - versão grande para página inteira."""
         # Ordem fixa consistente com os scorecards
         ordered_keys = ['estrutura', 'conteudo', 'riscos', 'ats', 'impacto', 'branding']
         label_mapping = {
@@ -752,10 +756,11 @@ class ReportPDFGenerator:
         values = [min(radar_data.get(k, 0) * 5, 100) for k in ordered_keys if k in radar_data]
         num_bars = len(labels)
 
-        svg_width = 500
-        svg_height = 25 + (num_bars * 40)
-        bar_height = 22
-        margin_left = 150
+        # Tamanho grande para ocupar a página
+        svg_width = 520
+        svg_height = 60 + (num_bars * 80)  # Aumentado de 40 para 80
+        bar_height = 35  # Aumentado de 22 para 35
+        margin_left = 180  # Aumentado para labels maiores
         margin_right = 50
 
         svg = f'<svg width="{svg_width}" height="{svg_height}" xmlns="http://www.w3.org/2000/svg">'
@@ -764,13 +769,17 @@ class ReportPDFGenerator:
         total_bar_width = svg_width - margin_left - margin_right
 
         for i, (label, value) in enumerate(zip(labels, values)):
-            y_pos = 12 + (i * 40)
+            y_pos = 30 + (i * 80)  # Aumentado espaçamento
             
-            svg += f'<rect x="{margin_left}" y="{y_pos}" width="{total_bar_width}" height="{bar_height}" fill="{self.colors["gray_light"]}" rx="3"/>'
+            # Barra de fundo
+            svg += f'<rect x="{margin_left}" y="{y_pos}" width="{total_bar_width}" height="{bar_height}" fill="{self.colors["gray_light"]}" rx="4"/>'
+            # Barra de score
             score_bar_width = (total_bar_width / 100) * value
-            svg += f'<rect x="{margin_left}" y="{y_pos}" width="{score_bar_width}" height="{bar_height}" fill="{self.colors["gold"]}" rx="3"/>'
-            svg += f'<text x="{margin_left - 8}" y="{y_pos + bar_height / 2 + 4}" font-family="Helvetica, Arial, sans-serif" font-size="10" fill="{self.colors["black"]}" text-anchor="end" font-weight="bold">{label}</text>'
-            svg += f'<text x="{margin_left + total_bar_width + 8}" y="{y_pos + bar_height / 2 + 4}" font-family="Helvetica, Arial, sans-serif" font-size="10" fill="{self.colors["gold"]}" font-weight="bold">{int(value)}</text>'
+            svg += f'<rect x="{margin_left}" y="{y_pos}" width="{score_bar_width}" height="{bar_height}" fill="{self.colors["gold"]}" rx="4"/>'
+            # Label
+            svg += f'<text x="{margin_left - 12}" y="{y_pos + bar_height / 2 + 5}" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="{self.colors["black"]}" text-anchor="end" font-weight="bold">{label}</text>'
+            # Score
+            svg += f'<text x="{margin_left + total_bar_width + 12}" y="{y_pos + bar_height / 2 + 5}" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="{self.colors["gold"]}" font-weight="bold">{int(value)}</text>'
 
         svg += '</svg>'
         return svg
