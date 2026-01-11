@@ -644,11 +644,17 @@ def deliver_report():
         )
         
         try:
-            get_brevo_api().send_transac_email(send_smtp_email)
+            print(f"[DEBUG] Tentando enviar email para {email} via Brevo...")
+            api_instance = get_brevo_api()
+            api_response = api_instance.send_transac_email(send_smtp_email)
+            print(f"[DEBUG] Resposta da Brevo: {api_response}")
             return jsonify({"success": True, "message": "Relatório enviado com sucesso!"}), 200
         except ApiException as e:
-            print(f"Erro ao enviar email: {e}")
-            return jsonify({"success": False, "error": f"Erro ao enviar email: {str(e)}"}), 500
+            print(f"[ERRO] Falha na API da Brevo: {e}")
+            return jsonify({"success": False, "error": f"Erro na API da Brevo: {str(e)}"}), 500
+        except Exception as e:
+            print(f"[ERRO] Erro inesperado no envio: {e}")
+            return jsonify({"success": False, "error": f"Erro inesperado: {str(e)}"}), 500
 
     except Exception as e:
         print(f"Erro na entrega do relatório: {e}")
