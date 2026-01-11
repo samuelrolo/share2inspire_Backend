@@ -132,26 +132,32 @@ class ReportPDFGenerator:
         
         /* Clear float */
         .clearfix { clear: both; }
+        
+        /* Analysis Lists */
+        .analysis-list { margin: 8pt 0; padding-left: 0; }
+        .analysis-list li { margin-bottom: 6pt; font-size: 9.5pt; color: #495057; list-style-type: none; padding-left: 15pt; position: relative; }
+        .analysis-list li:before { content: "●"; color: #BF9A33; font-size: 8pt; position: absolute; left: 0; top: 2pt; }
+        .insight-key { font-weight: bold; color: #1A1A1A; }
+        .insight-highlight { background: #FFF9E6; padding: 1pt 4pt; }
+        
+        /* No items message */
+        .no-items { font-style: italic; color: #6c757d; padding: 10pt; background: #f8f9fa; text-align: center; }
     </style>
 </head>
 <body>
 
 <!-- CAPA -->
-<div class="cover">
-    <div class="cover-subtitle">POSICIONAMENTO DE CARREIRA</div>
-    <div class="cover-title">RELATÓRIO DE ANÁLISE DE CV</div>
-    <div class="cover-candidate">{{ candidate_name }}</div>
-    <div class="cover-id">ID: {{ report_id }}</div>
-    <div class="cover-date">Gerado em: {{ date_formatted }}</div>
-    <div class="cover-tagline">Human Centred Career & Knowledge Platform</div>
-</div>
-
-<div class="page-footer">
-    Relatório de Análise de CV - Share2Inspire | Privado e Confidencial | {{ report_id }}
+<div style="text-align: center; padding-top: 200pt; page-break-after: always;">
+    <div style="font-size: 11pt; color: #BF9A33; letter-spacing: 2pt; margin-bottom: 60pt;">POSICIONAMENTO DE CARREIRA</div>
+    <div style="font-size: 28pt; font-weight: bold; color: #1A1A1A; margin-bottom: 40pt;">RELATÓRIO DE ANÁLISE DE CV</div>
+    <div style="font-size: 16pt; font-weight: bold; color: #333333; margin-bottom: 20pt;">{{ candidate_name }}</div>
+    <div style="font-size: 9pt; color: #6c757d; margin-bottom: 100pt;">ID: {{ report_id }}</div>
+    <div style="font-size: 10pt; color: #6c757d;">Gerado em: {{ date_formatted }}</div>
+    <div style="font-size: 10pt; color: #BF9A33; margin-top: 8pt;">Human Centred Career & Knowledge Platform</div>
+    <div style="font-size: 8pt; color: #adb5bd; margin-top: 40pt;">Relatório de Análise de CV - Share2Inspire | Privado e Confidencial</div>
 </div>
 
 <!-- PÁGINA 2: VISÃO GERAL -->
-<div class="page-break"></div>
 
 <div class="page-header">
     <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
@@ -200,29 +206,35 @@ class ReportPDFGenerator:
 <!-- SCORECARDS DIMENSIONAIS -->
 <table style="width: 100%; margin: 15pt 0;">
     <tr>
-        <td style="width: 16.66%; text-align: center;">
+        <td style="width: 16.66%; text-align: center; vertical-align: top;">
             <img src="{{ scorecard_estrutura }}" width="60" alt="Estrutura">
             <div class="scorecard-label">Estrutura</div>
+            <div style="font-size: 7pt; color: #6c757d; margin-top: 2pt;">Organização e clareza visual</div>
         </td>
-        <td style="width: 16.66%; text-align: center;">
+        <td style="width: 16.66%; text-align: center; vertical-align: top;">
             <img src="{{ scorecard_conteudo }}" width="60" alt="Conteúdo">
             <div class="scorecard-label">Conteúdo</div>
+            <div style="font-size: 7pt; color: #6c757d; margin-top: 2pt;">Relevância e profundidade</div>
         </td>
-        <td style="width: 16.66%; text-align: center;">
+        <td style="width: 16.66%; text-align: center; vertical-align: top;">
+            <img src="{{ scorecard_consistencia }}" width="60" alt="Consistência">
+            <div class="scorecard-label">Consistência</div>
+            <div style="font-size: 7pt; color: #6c757d; margin-top: 2pt;">Coerência e ausência de lacunas</div>
+        </td>
+        <td style="width: 16.66%; text-align: center; vertical-align: top;">
             <img src="{{ scorecard_ats }}" width="60" alt="ATS">
             <div class="scorecard-label">ATS</div>
+            <div style="font-size: 7pt; color: #6c757d; margin-top: 2pt;">Compatibilidade com sistemas</div>
         </td>
-        <td style="width: 16.66%; text-align: center;">
+        <td style="width: 16.66%; text-align: center; vertical-align: top;">
             <img src="{{ scorecard_impacto }}" width="60" alt="Impacto">
             <div class="scorecard-label">Impacto</div>
+            <div style="font-size: 7pt; color: #6c757d; margin-top: 2pt;">Resultados e métricas</div>
         </td>
-        <td style="width: 16.66%; text-align: center;">
+        <td style="width: 16.66%; text-align: center; vertical-align: top;">
             <img src="{{ scorecard_branding }}" width="60" alt="Branding">
             <div class="scorecard-label">Branding</div>
-        </td>
-        <td style="width: 16.66%; text-align: center;">
-            <img src="{{ scorecard_riscos }}" width="60" alt="Riscos">
-            <div class="scorecard-label">Riscos</div>
+            <div style="font-size: 7pt; color: #6c757d; margin-top: 2pt;">Marca pessoal e diferenciação</div>
         </td>
     </tr>
 </table>
@@ -335,15 +347,15 @@ class ReportPDFGenerator:
     <p class="dimension-analysis">{{ analysis.skills_differentiation.differentiation_factors | default('Análise não disponível.') | truncate(500) }}</p>
 </div>
 
-<!-- Riscos -->
+<!-- Consistência -->
 <div class="dimension-item">
     <div class="dimension-header">
-        <span class="dimension-score">{{ scores.riscos }}/100</span>
-        <span class="dimension-title">Riscos e Inconsistências</span>
+        <span class="dimension-score">{{ scores.consistencia }}/100</span>
+        <span class="dimension-title">Consistência e Coerência</span>
         <div class="clearfix"></div>
     </div>
     <div class="dimension-bar">
-        <div class="dimension-bar-fill" style="width: {{ scores.riscos }}%;"></div>
+        <div class="dimension-bar-fill" style="width: {{ scores.consistencia }}%;"></div>
     </div>
     <p class="dimension-analysis">{{ analysis.strategic_risks.identified_risks | default('Análise não disponível.') | truncate(500) }}</p>
 </div>
@@ -573,17 +585,19 @@ class ReportPDFGenerator:
 
     def generate_bar_chart(self, radar_data):
         """Gera um gráfico de barras horizontais SVG elegante."""
+        # Ordem fixa consistente com os scorecards
+        ordered_keys = ['estrutura', 'conteudo', 'riscos', 'ats', 'impacto', 'branding']
         label_mapping = {
             'estrutura': 'Estrutura & Clareza',
             'conteudo': 'Conteúdo & Relevância',
+            'riscos': 'Consistência',
             'ats': 'Compatibilidade ATS',
             'impacto': 'Impacto & Resultados',
-            'branding': 'Marca Pessoal',
-            'riscos': 'Riscos & Inconsistências'
+            'branding': 'Marca Pessoal'
         }
         
-        labels = [label_mapping.get(k, k.capitalize()) for k in radar_data.keys()]
-        values = [min(v * 5, 100) for v in radar_data.values()]
+        labels = [label_mapping.get(k, k.capitalize()) for k in ordered_keys if k in radar_data]
+        values = [min(radar_data.get(k, 0) * 5, 100) for k in ordered_keys if k in radar_data]
         num_bars = len(labels)
 
         svg_width = 500
@@ -620,10 +634,10 @@ class ReportPDFGenerator:
         scores = {
             'estrutura': min(radar_data.get('estrutura', 0) * 5, 100),
             'conteudo': min(radar_data.get('conteudo', 0) * 5, 100),
+            'consistencia': min(radar_data.get('riscos', 0) * 5, 100),  # Riscos invertido para Consistência
             'ats': min(radar_data.get('ats', 0) * 5, 100),
             'impacto': min(radar_data.get('impacto', 0) * 5, 100),
-            'branding': min(radar_data.get('branding', 0) * 5, 100),
-            'riscos': min(radar_data.get('riscos', 0) * 5, 100)
+            'branding': min(radar_data.get('branding', 0) * 5, 100)
         }
         
         overall_score = sum(scores.values()) / len(scores) if scores else 0
@@ -633,10 +647,10 @@ class ReportPDFGenerator:
         
         scorecard_estrutura = f"data:image/svg+xml;base64,{base64.b64encode(self.generate_mini_scorecard(scores['estrutura'], 60).encode()).decode()}"
         scorecard_conteudo = f"data:image/svg+xml;base64,{base64.b64encode(self.generate_mini_scorecard(scores['conteudo'], 60).encode()).decode()}"
+        scorecard_consistencia = f"data:image/svg+xml;base64,{base64.b64encode(self.generate_mini_scorecard(scores['consistencia'], 60).encode()).decode()}"
         scorecard_ats = f"data:image/svg+xml;base64,{base64.b64encode(self.generate_mini_scorecard(scores['ats'], 60).encode()).decode()}"
         scorecard_impacto = f"data:image/svg+xml;base64,{base64.b64encode(self.generate_mini_scorecard(scores['impacto'], 60).encode()).decode()}"
         scorecard_branding = f"data:image/svg+xml;base64,{base64.b64encode(self.generate_mini_scorecard(scores['branding'], 60).encode()).decode()}"
-        scorecard_riscos = f"data:image/svg+xml;base64,{base64.b64encode(self.generate_mini_scorecard(scores['riscos'], 60).encode()).decode()}"
         
         bar_chart_svg = self.generate_bar_chart(radar_data)
         bar_chart = f"data:image/svg+xml;base64,{base64.b64encode(bar_chart_svg.encode()).decode()}"
@@ -655,10 +669,10 @@ class ReportPDFGenerator:
             main_scorecard=main_scorecard,
             scorecard_estrutura=scorecard_estrutura,
             scorecard_conteudo=scorecard_conteudo,
+            scorecard_consistencia=scorecard_consistencia,
             scorecard_ats=scorecard_ats,
             scorecard_impacto=scorecard_impacto,
             scorecard_branding=scorecard_branding,
-            scorecard_riscos=scorecard_riscos,
             bar_chart=bar_chart
         )
 

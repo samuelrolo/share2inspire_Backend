@@ -262,7 +262,7 @@ ESTRUTURA DE OUTPUT (JSON)
         ],
         "phrase_improvements": [
             {{
-                "original": "Frase original extraída do CV (copiar exatamente)",
+                "original": "COPIAR EXATAMENTE uma frase real do CV - não inventar. Deve ser uma frase que existe no documento.",
                 "problem": "ANÁLISE (100-150 palavras): O que está subotimizado e impacto negativo na perceção.",
                 "improved": "Versão otimizada da frase com métricas e linguagem executiva",
                 "explanation": "EXPLICAÇÃO (100-150 palavras): Porque a versão melhorada é superior. Valor estratégico e otimização ATS."
