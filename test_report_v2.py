@@ -17,7 +17,7 @@ test_analysis_data = {
         "detected_sector": "Recursos Humanos / Transformação Digital",
         "total_years_exp": "11 anos",
         "seniority": "Direção/Executivo",
-        "education_level": "Mestrado em Gestão de Recursos Humanos",
+        "education_level": "Licenciatura em Gestão de Recursos Humanos",
         "languages_detected": ["Português (Nativo)", "Inglês (Fluente)", "Espanhol (Intermédio)"],
         "key_skills": ["Transformação Digital", "Gestão de Mudança", "Liderança de Equipas", "Otimização de Processos", "People Analytics"]
     },
@@ -27,7 +27,7 @@ test_analysis_data = {
             "Trajetória de 11 anos com progressão consistente em RH e transformação digital",
             "Experiência em organizações de referência como AstraZeneca e Deloitte",
             "Especialização em área de elevada procura: digitalização de processos de RH",
-            "Formação académica sólida com Mestrado em Gestão de RH"
+            "Formação académica sólida com Licenciatura em Gestão de RH"
         ],
         "improvements": [
             "Quantificar resultados com métricas de impacto e ROI das iniciativas",

@@ -15,6 +15,103 @@ from jinja2 import Template
 class ReportPDFGenerator:
     """Gerador de relatórios PDF com design premium e análises aprofundadas."""
     
+    def _convert_to_bullets(self, text):
+        """Converte texto com marcadores markdown para HTML com bullets."""
+        if not text:
+            return '<p class="no-items">Análise não disponível.</p>'
+        
+        import re
+        
+        # Converter **texto** para <strong>texto</strong>
+        text = re.sub(r'\*\*([^*]+)\*\*', r'<strong class="insight-key">\1</strong>', text)
+        
+        # Dividir por linhas
+        lines = text.strip().split('\n')
+        
+        html_parts = []
+        current_list = []
+        current_heading = None
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Verificar se é um heading (termina com :)
+            if line.endswith(':') and len(line) < 50:
+                # Fechar lista anterior se existir
+                if current_list:
+                    html_parts.append('<ul class="analysis-list">')
+                    html_parts.extend([f'<li>{item}</li>' for item in current_list])
+                    html_parts.append('</ul>')
+                    current_list = []
+                
+                current_heading = line
+                html_parts.append(f'<div style="font-weight: bold; color: #BF9A33; margin-top: 10pt; margin-bottom: 5pt;">{line}</div>')
+            
+            # Verificar se é um bullet (começa com - ou • ou *)
+            elif line.startswith(('-', '•', '*')):
+                bullet_text = line.lstrip('-•* ').strip()
+                if bullet_text:
+                    current_list.append(bullet_text)
+            
+            # Texto normal - adicionar como parágrafo ou bullet
+            else:
+                if current_list:
+                    current_list.append(line)
+                else:
+                    html_parts.append(f'<p style="margin-bottom: 8pt;">{line}</p>')
+        
+        # Fechar lista final se existir
+        if current_list:
+            html_parts.append('<ul class="analysis-list">')
+            html_parts.extend([f'<li>{item}</li>' for item in current_list])
+            html_parts.append('</ul>')
+        
+        return ''.join(html_parts) if html_parts else f'<p>{text}</p>'
+    
+    def _process_analysis_for_bullets(self, analysis_data):
+        """Processa todos os campos de análise textual para formato de bullets HTML."""
+        import copy
+        processed = copy.deepcopy(analysis_data)
+        
+        # Campos a processar para bullets
+        text_fields = [
+            ('executive_summary', 'market_positioning'),
+            ('executive_summary', 'key_decision_factors'),
+            ('diagnostic_impact', 'first_30_seconds_read'),
+            ('diagnostic_impact', 'impact_strengths'),
+            ('diagnostic_impact', 'impact_dilutions'),
+            ('content_structure_analysis', 'organization_hierarchy'),
+            ('content_structure_analysis', 'responsibilities_results_balance'),
+            ('content_structure_analysis', 'orientation'),
+            ('ats_digital_recruitment', 'compatibility'),
+            ('ats_digital_recruitment', 'filtering_risks'),
+            ('ats_digital_recruitment', 'alignment'),
+            ('skills_differentiation', 'technical_behavioral_analysis'),
+            ('skills_differentiation', 'differentiation_factors'),
+            ('skills_differentiation', 'common_undifferentiated'),
+            ('strategic_risks', 'identified_risks'),
+            ('languages_analysis', 'languages_assessment'),
+            ('education_analysis', 'education_assessment'),
+            ('priority_recommendations', 'immediate_adjustments'),
+            ('priority_recommendations', 'refinement_areas'),
+            ('priority_recommendations', 'deep_repositioning'),
+            ('market_analysis', 'sector_trends'),
+            ('market_analysis', 'competitive_landscape'),
+            ('market_analysis', 'opportunities_threats'),
+            ('final_conclusion', 'executive_synthesis'),
+            ('final_conclusion', 'next_steps'),
+        ]
+        
+        for section, field in text_fields:
+            if section in processed and field in processed[section]:
+                original_text = processed[section][field]
+                if isinstance(original_text, str) and len(original_text) > 50:
+                    processed[section][field] = self._convert_to_bullets(original_text)
+        
+        return processed
+    
     def __init__(self):
         self.colors = {
             'gold': '#BF9A33',
@@ -147,14 +244,16 @@ class ReportPDFGenerator:
 <body>
 
 <!-- CAPA -->
-<div style="text-align: center; padding-top: 200pt; page-break-after: always;">
-    <div style="font-size: 11pt; color: #BF9A33; letter-spacing: 2pt; margin-bottom: 60pt;">POSICIONAMENTO DE CARREIRA</div>
-    <div style="font-size: 28pt; font-weight: bold; color: #1A1A1A; margin-bottom: 40pt;">RELATÓRIO DE ANÁLISE DE CV</div>
-    <div style="font-size: 16pt; font-weight: bold; color: #333333; margin-bottom: 20pt;">{{ candidate_name }}</div>
-    <div style="font-size: 9pt; color: #6c757d; margin-bottom: 100pt;">ID: {{ report_id }}</div>
-    <div style="font-size: 10pt; color: #6c757d;">Gerado em: {{ date_formatted }}</div>
-    <div style="font-size: 10pt; color: #BF9A33; margin-top: 8pt;">Human Centred Career & Knowledge Platform</div>
-    <div style="font-size: 8pt; color: #adb5bd; margin-top: 40pt;">Relatório de Análise de CV - Share2Inspire | Privado e Confidencial</div>
+<div style="text-align: center; page-break-after: always;">
+    <div style="padding-top: 120pt;">
+        <div style="font-size: 10pt; color: #BF9A33; letter-spacing: 2pt;">POSICIONAMENTO DE CARREIRA</div>
+    </div>
+    <div style="font-size: 26pt; font-weight: bold; color: #1A1A1A; margin-top: 60pt;">RELATÓRIO DE ANÁLISE DE CV</div>
+    <div style="font-size: 16pt; font-weight: bold; color: #333333; margin-top: 80pt;">{{ candidate_name }}</div>
+    <div style="font-size: 9pt; color: #6c757d; margin-top: 80pt;">ID: {{ report_id }}</div>
+    <div style="font-size: 9pt; color: #6c757d; margin-top: 5pt;">Gerado em: {{ date_formatted }}</div>
+    <div style="font-size: 9pt; color: #BF9A33; margin-top: 80pt;">Human Centred Career & Knowledge Platform</div>
+    <div style="font-size: 8pt; color: #adb5bd; margin-top: 10pt;">Relatório de Análise de CV - Share2Inspire | Privado e Confidencial</div>
 </div>
 
 <!-- PÁGINA 2: VISÃO GERAL -->
@@ -245,10 +344,10 @@ class ReportPDFGenerator:
 <h2>Sumário Executivo Estratégico</h2>
 
 <h3>Posicionamento de Mercado</h3>
-<p>{{ analysis.executive_summary.market_positioning | default('Análise não disponível.') }}</p>
+<div class="analysis-content">{{ analysis.executive_summary.market_positioning | default('Análise não disponível.') | safe }}</div>
 
 <h3>Fatores-Chave de Decisão</h3>
-<p>{{ analysis.executive_summary.key_decision_factors | default('Análise não disponível.') }}</p>
+<div class="analysis-content">{{ analysis.executive_summary.key_decision_factors | default('Análise não disponível.') | safe }}</div>
 
 <!-- PÁGINA 4: ANÁLISE DIMENSIONAL -->
 <div class="page-break"></div>
@@ -274,7 +373,7 @@ class ReportPDFGenerator:
     <div class="dimension-bar">
         <div class="dimension-bar-fill" style="width: {{ scores.estrutura }}%;"></div>
     </div>
-    <p class="dimension-analysis">{{ analysis.content_structure_analysis.organization_hierarchy | default('Análise não disponível.') | truncate(500) }}</p>
+    <div class="dimension-analysis">{{ analysis.content_structure_analysis.organization_hierarchy | default('Análise não disponível.') | safe }}</div>
     {% if analysis.content_structure_analysis.organization_hierarchy_missing %}
     <div class="dimension-focus">
         <strong class="text-gold">Foco de Melhoria:</strong> {{ analysis.content_structure_analysis.organization_hierarchy_missing | truncate(200) }}
@@ -292,7 +391,7 @@ class ReportPDFGenerator:
     <div class="dimension-bar">
         <div class="dimension-bar-fill" style="width: {{ scores.conteudo }}%;"></div>
     </div>
-    <p class="dimension-analysis">{{ analysis.content_structure_analysis.responsibilities_results_balance | default('Análise não disponível.') | truncate(500) }}</p>
+    <div class="dimension-analysis">{{ analysis.content_structure_analysis.responsibilities_results_balance | default('Análise não disponível.') | safe }}</div>
 </div>
 
 <!-- ATS -->
@@ -305,7 +404,7 @@ class ReportPDFGenerator:
     <div class="dimension-bar">
         <div class="dimension-bar-fill" style="width: {{ scores.ats }}%;"></div>
     </div>
-    <p class="dimension-analysis">{{ analysis.ats_digital_recruitment.compatibility | default('Análise não disponível.') | truncate(500) }}</p>
+    <div class="dimension-analysis">{{ analysis.ats_digital_recruitment.compatibility | default('Análise não disponível.') | safe }}</div>
 </div>
 
 <!-- PÁGINA 5: ANÁLISE DIMENSIONAL (CONT.) -->
@@ -327,7 +426,7 @@ class ReportPDFGenerator:
     <div class="dimension-bar">
         <div class="dimension-bar-fill" style="width: {{ scores.impacto }}%;"></div>
     </div>
-    <p class="dimension-analysis">{{ analysis.diagnostic_impact.impact_strengths | default('Análise não disponível.') | truncate(500) }}</p>
+    <div class="dimension-analysis">{{ analysis.diagnostic_impact.impact_strengths | default('Análise não disponível.') | safe }}</div>
 </div>
 
 <!-- Branding -->
@@ -340,7 +439,7 @@ class ReportPDFGenerator:
     <div class="dimension-bar">
         <div class="dimension-bar-fill" style="width: {{ scores.branding }}%;"></div>
     </div>
-    <p class="dimension-analysis">{{ analysis.skills_differentiation.differentiation_factors | default('Análise não disponível.') | truncate(500) }}</p>
+    <div class="dimension-analysis">{{ analysis.skills_differentiation.differentiation_factors | default('Análise não disponível.') | safe }}</div>
 </div>
 
 <!-- Consistência -->
@@ -353,7 +452,7 @@ class ReportPDFGenerator:
     <div class="dimension-bar">
         <div class="dimension-bar-fill" style="width: {{ scores.consistencia }}%;"></div>
     </div>
-    <p class="dimension-analysis">{{ analysis.strategic_risks.identified_risks | default('Análise não disponível.') | truncate(500) }}</p>
+    <div class="dimension-analysis">{{ analysis.strategic_risks.identified_risks | default('Análise não disponível.') | safe }}</div>
 </div>
 
 <!-- PÁGINA 6: DIAGNÓSTICO DE IMPACTO -->
@@ -366,13 +465,13 @@ class ReportPDFGenerator:
 <h2>Diagnóstico de Impacto Profissional</h2>
 
 <h3>Leitura em 30 Segundos por um Recrutador Sénior</h3>
-<p>{{ analysis.diagnostic_impact.first_30_seconds_read | default('Análise não disponível.') }}</p>
+<div class="analysis-content">{{ analysis.diagnostic_impact.first_30_seconds_read | default('Análise não disponível.') | safe }}</div>
 
 <h3>Pontos Fortes de Impacto</h3>
-<p>{{ analysis.diagnostic_impact.impact_strengths | default('Análise não disponível.') }}</p>
+<div class="analysis-content">{{ analysis.diagnostic_impact.impact_strengths | default('Análise não disponível.') | safe }}</div>
 
 <h3>Pontos de Diluição de Impacto</h3>
-<p>{{ analysis.diagnostic_impact.impact_dilutions | default('Análise não disponível.') }}</p>
+<div class="analysis-content">{{ analysis.diagnostic_impact.impact_dilutions | default('Análise não disponível.') | safe }}</div>
 
 <!-- PÁGINA 7: ANÁLISE ATS -->
 <div class="page-break"></div>
@@ -384,13 +483,13 @@ class ReportPDFGenerator:
 <h2>Análise ATS e Recrutamento Digital</h2>
 
 <h3>Compatibilidade com Sistemas ATS</h3>
-<p>{{ analysis.ats_digital_recruitment.compatibility | default('Análise não disponível.') }}</p>
+<div class="analysis-content">{{ analysis.ats_digital_recruitment.compatibility | default('Análise não disponível.') | safe }}</div>
 
 <h3>Riscos de Filtragem Automática</h3>
-<p>{{ analysis.ats_digital_recruitment.filtering_risks | default('Análise não disponível.') }}</p>
+<div class="analysis-content">{{ analysis.ats_digital_recruitment.filtering_risks | default('Análise não disponível.') | safe }}</div>
 
 <h3>Alinhamento com Práticas de Recrutamento</h3>
-<p>{{ analysis.ats_digital_recruitment.alignment | default('Análise não disponível.') }}</p>
+<div class="analysis-content">{{ analysis.ats_digital_recruitment.alignment | default('Análise não disponível.') | safe }}</div>
 
 <!-- PÁGINA 8: MELHORIAS DE FRASES -->
 <div class="page-break"></div>
@@ -424,10 +523,10 @@ class ReportPDFGenerator:
 <h2>Análise de Mercado e Posicionamento</h2>
 
 <h3>Contexto: {{ analysis.pdf_extended_content.sector_analysis.identified_sector | default('Setor não identificado') }}</h3>
-<p>{{ analysis.pdf_extended_content.sector_analysis.sector_trends | default('Análise de tendências não disponível.') }}</p>
+<div class="analysis-content">{{ analysis.pdf_extended_content.sector_analysis.sector_trends | default('Análise de tendências não disponível.') | safe }}</div>
 
 <h3>Panorama Competitivo</h3>
-<p>{{ analysis.pdf_extended_content.sector_analysis.competitive_landscape | default('Análise competitiva não disponível.') }}</p>
+<div class="analysis-content">{{ analysis.pdf_extended_content.sector_analysis.competitive_landscape | default('Análise competitiva não disponível.') | safe }}</div>
 
 <!-- PÁGINA 10: CERTIFICAÇÕES RECOMENDADAS -->
 <div class="page-break"></div>
@@ -459,17 +558,17 @@ class ReportPDFGenerator:
 
 <div class="recommendation-item">
     <div class="recommendation-priority" style="color: #e74c3c;">Ajustes Imediatos</div>
-    <p>{{ analysis.priority_recommendations.immediate_adjustments | default('Recomendações não disponíveis.') }}</p>
+    <div class="analysis-content">{{ analysis.priority_recommendations.immediate_adjustments | default('Recomendações não disponíveis.') | safe }}</div>
 </div>
 
 <div class="recommendation-item">
     <div class="recommendation-priority" style="color: #f39c12;">Áreas de Refinamento</div>
-    <p>{{ analysis.priority_recommendations.refinement_areas | default('Recomendações não disponíveis.') }}</p>
+    <div class="analysis-content">{{ analysis.priority_recommendations.refinement_areas | default('Recomendações não disponíveis.') | safe }}</div>
 </div>
 
 <div class="recommendation-item">
     <div class="recommendation-priority" style="color: #27ae60;">Reposicionamento Profundo</div>
-    <p>{{ analysis.priority_recommendations.deep_repositioning | default('Recomendações não disponíveis.') }}</p>
+    <div class="analysis-content">{{ analysis.priority_recommendations.deep_repositioning | default('Recomendações não disponíveis.') | safe }}</div>
 </div>
 
 <!-- PÁGINA 12: CONCLUSÃO E SERVIÇOS -->
@@ -482,10 +581,17 @@ class ReportPDFGenerator:
 <h2>Conclusão Executiva</h2>
 
 <h3>Potencial Após Melhorias</h3>
-<p>{{ analysis.executive_conclusion.potential_after_improvements | default('Conclusão não disponível.') }}</p>
+<div class="analysis-content">{{ analysis.executive_conclusion.potential_after_improvements | default('Conclusão não disponível.') | safe }}</div>
 
 <h3>Competitividade Esperada</h3>
-<p>{{ analysis.executive_conclusion.expected_competitiveness | default('Análise não disponível.') }}</p>
+<div class="analysis-content">{{ analysis.executive_conclusion.expected_competitiveness | default('Análise não disponível.') | safe }}</div>
+
+<!-- PÁGINA SEPARADA: OUTROS SERVIÇOS -->
+<div class="page-break"></div>
+
+<div class="page-header">
+    <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
+</div>
 
 <h2>Outros Serviços Share2Inspire</h2>
 
@@ -494,19 +600,19 @@ class ReportPDFGenerator:
 <table class="services-table">
     <tr>
         <td>
-            <div class="service-icon">◆</div>
+            <div class="service-icon">⚡</div>
             <div class="service-title">Kickstart Pro</div>
             <div class="service-desc">Sessão estratégica de 1h para desbloquear decisões críticas de carreira.</div>
             <div class="service-link">Saber Mais →</div>
         </td>
         <td>
-            <div class="service-icon">◆</div>
+            <div class="service-icon">★</div>
             <div class="service-title">Mentoria de Carreira</div>
             <div class="service-desc">Programa de acompanhamento personalizado para objetivos ambiciosos.</div>
             <div class="service-link">Saber Mais →</div>
         </td>
         <td>
-            <div class="service-icon">◆</div>
+            <div class="service-icon">◎</div>
             <div class="service-title">Revisão de LinkedIn</div>
             <div class="service-desc">Otimização do perfil para máxima visibilidade e atração de recrutadores.</div>
             <div class="service-link">Saber Mais →</div>
@@ -655,9 +761,12 @@ class ReportPDFGenerator:
         report_id = f"CVA {now.strftime('%Y %m %d %H %M')}"
         date_formatted = now.strftime("%d/%m/%Y %H:%M")
 
+        # Processar campos de análise para formato de bullets
+        processed_analysis = self._process_analysis_for_bullets(analysis_data)
+        
         template = Template(self._get_template())
         html = template.render(
-            analysis=analysis_data,
+            analysis=processed_analysis,
             candidate_name=candidate_name,
             report_id=report_id,
             date_formatted=date_formatted,

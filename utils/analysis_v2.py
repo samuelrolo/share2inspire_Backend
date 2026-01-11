@@ -74,11 +74,12 @@ Analisa este currículo para um profissional que visa a função de '{role}' com
 REGRAS FUNDAMENTAIS DE QUALIDADE (OBRIGATÓRIAS)
 ═══════════════════════════════════════════════════════════════════════════════
 
-1. DENSIDADE TEXTUAL OBRIGATÓRIA:
-   - Cada campo de análise textual DEVE conter entre 300 e 500 palavras
-   - PROIBIDO: Respostas curtas, listas simples, frases isoladas, etiquetas genéricas
-   - OBRIGATÓRIO: Parágrafos densos, analíticos, com linguagem executiva e profundidade de consultoria sénior
-   - Cada parágrafo deve ter no mínimo 5-7 frases completas e contextualizadas
+1. FORMATO DE ANÁLISE ESTRUTURADA:
+   - Cada campo de análise DEVE usar formato de BULLETS organizados por subtemas
+   - Cada bullet deve ter 2-3 frases com insight específico e açionável
+   - Usar **negrito** para destacar os conceitos-chave em cada bullet
+   - Organizar bullets por categorias temáticas (ex: "Pontos Fortes:", "Áreas de Melhoria:", "Recomendações:")
+   - Mínimo de 6-8 bullets por campo de análise, cada um com profundidade
 
 2. CONTEÚDO COM VALOR REAL:
    - Desenvolver cada ponto com exemplos concretos e implicações práticas
