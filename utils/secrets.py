@@ -24,11 +24,13 @@ def get_secret(secret_id, default=None, project_id=None):
     try:
         # Se project_id não for fornecido, tentar obter do ambiente
         if not project_id:
-            project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+            project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+            logger.info(f"[DEBUG] GOOGLE_CLOUD_PROJECT detectado: {project_id}")
             
         if not project_id:
             logger.warning(f"GOOGLE_CLOUD_PROJECT não definido. Não é possível buscar '{secret_id}' no Secret Manager.")
-            return default
+            logger.warning(f"[DEBUG] Retornando default para \'{secret_id}\' porque GOOGLE_CLOUD_PROJECT não está definido.")
+        return default
 
         logger.info(f"Fetching secret '{secret_id}' from project '{project_id}'...")
         client = secretmanager.SecretManagerServiceClient()
@@ -38,8 +40,10 @@ def get_secret(secret_id, default=None, project_id=None):
         secret_val = response.payload.data.decode("UTF-8").strip()
         logger.info(f"Secret '{secret_id}' obtained from Secret Manager: {secret_val[:10]}...")
         
+        logger.info(f"[DEBUG] Secret \'{secret_id}\' obtido com sucesso do Secret Manager.")
         return secret_val
         
     except Exception as e:
         logger.warning(f"Erro ao obter segredo '{secret_id}' do Secret Manager: {e}")
+        logger.warning(f"[DEBUG] Retornando default para \'{secret_id}\' porque GOOGLE_CLOUD_PROJECT não está definido.")
         return default

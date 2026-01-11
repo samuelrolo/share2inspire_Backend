@@ -20,6 +20,7 @@ class CVAnalyzer:
     
     def __init__(self):
         self.api_key = get_secret("GEMINI_API_KEY")
+        print(f"[DEBUG] GEMINI_API_KEY obtida: {self.api_key is not None}")
         self.model = None
         
         if self.api_key:
@@ -498,8 +499,20 @@ Nível de Experiência: {experience_level}
                 "languages_detected": [],
                 "key_skills": []
             },
+            "global_summary": {
+                "strengths": [],
+                "improvements": []
+            },
             "executive_summary": {
                 "global_score": int(sum(radar_data.values()) / len(radar_data) * 5),
+                "global_score_breakdown": {
+                    "structure_clarity": radar_data.get("estrutura", 0) * 5,
+                    "content_relevance": radar_data.get("conteudo", 0) * 5,
+                    "risks_inconsistencies": radar_data.get("riscos", 0) * 5,
+                    "ats_compatibility": radar_data.get("ats", 0) * 5,
+                    "impact_results": radar_data.get("impacto", 0) * 5,
+                    "personal_brand": radar_data.get("branding", 0) * 5
+                },
                 "market_positioning": "Análise detalhada não disponível. Por favor, tente novamente ou contacte o suporte.",
                 "key_decision_factors": "Análise detalhada não disponível."
             },
