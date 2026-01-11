@@ -24,8 +24,7 @@ class CVAnalyzer:
         
         if self.api_key:
             try:
-                # Configurar a API key globalmente para a biblioteca google-genai
-                os.environ["GOOGLE_API_KEY"] = self.api_key
+                genai.configure(api_key=self.api_key)
                 self.model = genai.GenerativeModel("gemini-pro")
                 print("[INFO] Modelo Gemini inicializado com sucesso.")
             except Exception as e:
