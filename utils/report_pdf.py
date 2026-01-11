@@ -1,380 +1,843 @@
-
 # -*- coding: utf-8 -*-
 """
 Gerador de Relatório PDF Premium para Análise de CV
-Share2Inspire - Versão 5.0 com Foco em Densidade e Design de Consultoria
+Share2Inspire - Versão 6.0 
+Design Sofisticado e Minimalista com Scorecards Circulares
 """
 
 import io
 import math
 import datetime
+import base64
 from xhtml2pdf import pisa
 from jinja2 import Template
-import PyPDF2
 
 class ReportPDFGenerator:
-    def __init__(self):
-        self.template_html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <style>
-                @page {
-                    size: A4;
-                    margin: 1.8cm;
-                    @frame footer_frame {
-                        -pdf-frame-content: footer_content;
-                        left: 1.8cm; width: 17.4cm; top: 27.7cm; height: 1cm;
-                    }
-                    @bottom-left {
-                        content: "CV Analyzer | {{ candidate_name }} | {{ date_formatted }}";
-                        font-family: Helvetica;
-                        font-size: 8pt;
-                        color: #adb5bd;
-                    }
-                    @bottom-right {
-                        content: "Página " counter(page) " de " counter(pages);
-                        font-family: Helvetica;
-                        font-size: 8pt;
-                        color: #adb5bd;
-                    }
-                }
-
-                body {
-                    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-                    color: #343a40; /* Cinza escuro para texto */
-                    line-height: 1.45;
-                    font-size: 10pt;
-                    font-weight: 400; /* Peso normal para melhor leitura */
-                }
-
-                /* --- CORES E TIPOGRAFIA --- */
-                .text-gold { color: #BF9A33; }
-                h1, h2, h3, h4 {
-                    font-weight: 700; /* Negrito para todos os títulos */
-                    color: #212529; /* Preto suave */
-                    margin: 0;
-                    padding: 0;
-                    line-height: 1.2;
-                }
-                h1 { font-size: 22pt; margin-bottom: 10pt; }
-                h2 { font-size: 16pt; margin-top: 25pt; margin-bottom: 12pt; border-bottom: 1.5pt solid #BF9A33; padding-bottom: 6pt; }
-                h3 { font-size: 12pt; font-weight: 600; color: #BF9A33; margin-top: 20pt; margin-bottom: 8pt; }
-                p { margin: 0 0 10pt 0; text-align: justify; }
-
-                /* --- ESTRUTURA E LAYOUT --- */
-                .header-logo {
-                    text-align: left;
-                    margin-bottom: 25pt;
-                }
-                .header-logo img {
-                    height: 25px; /* Logo discreto */
-                }
-
-                .footer {
-                    font-size: 8pt;
-                    color: #adb5bd; /* Cinza claro */
-                    text-align: center;
-                }
-
-                /* --- BLOCOS DE CONSULTORIA (SUBSTITUI TABELAS E CAIXAS) --- */
-                .consulting-block {
-                    margin-bottom: 20pt;
-                    padding: 0;
-                    border: none;
-                    background: none;
-                }
-
-                /* --- ANTES/DEPOIS --- */
-                .before-after-block {
-                    margin: 20pt 0;
-                    padding: 15pt;
-                    background-color: #f8f9fa; /* Fundo muito leve */
-                    border-left: 4pt solid #BF9A33;
-                }
-                .ba-label {
-                    font-size: 9pt;
-                    font-weight: 700;
-                    text-transform: uppercase;
-                    letter-spacing: 1pt;
-                    margin-bottom: 8pt;
-                }
-                .before-label { color: #e74c3c; } /* Vermelho para 'Antes' */
-                .after-label { color: #27ae60; } /* Verde para 'Depois' */
-                .ba-text {
-                    font-style: italic;
-                    color: #495057;
-                    margin-bottom: 15pt;
-                }
-
-                /* --- GRÁFICO RADAR --- */
-                .radar-container {
-                    text-align: center;
-                    margin: 30pt 0;
-                }
-
-                /* --- PRÓXIMOS PASSOS --- */
-                .next-steps-container {
-                    margin-top: 30pt;
-                    display: block;
-                    width: 100%;
-                }
-                .step-box {
-                    width: 30%;
-                    display: inline-block;
-                    text-align: center;
-                    padding: 0 10pt;
-                }
-                .step-box h4 {
-                    color: #BF9A33;
-                    font-size: 11pt;
-                    margin-bottom: 8pt;
-                }
-                .step-box p {
-                    font-size: 9pt;
-                    color: #6c757d;
-                    text-align: center;
-                }
-
-                /* --- NOVA APRESENTAÇÃO DE PONTUAÇÃO (SEM TABELA) --- */
-                .score-item {
-                    margin-bottom: 15pt;
-                    border-left: 3pt solid #e0e0e0;
-                    padding-left: 10pt;
-                }
-                .score-item-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: baseline;
-                    margin-bottom: 5pt;
-                }
-                .score-item-header h4 {
-                    margin: 0;
-                    color: #212529;
-                    font-size: 11pt;
-                }
-                .score-item-value {
-                    font-size: 14pt;
-                    font-weight: 700;
-                    color: #BF9A33;
-                }
-                .score-item-analysis, .score-item-focus {
-                    font-size: 9.5pt;
-                    color: #495057;
-                    margin-bottom: 5pt;
-                    text-align: justify;
-                }
-                .score-item-focus strong { color: #BF9A33; }
-
-            </style>
-        </head>
-        <body>
-
-            <!-- CABEÇALHO COM LOGO -->
-            <div class="header-logo">
-                <img src="https://share2inspire.com/wp-content/uploads/2022/06/Share2Inspire-Logo-Gold-1.png" alt="Share2Inspire-Logo">
-            </div>
-
-            <!-- TÍTULO DO RELATÓRIO -->
-            <h1>Relatório de Análise de Currículo</h1>
-            <p style="font-size: 12pt; color: #6c757d; margin-top: -8pt;">Análise Estratégica para {{ analysis.candidate_profile.detected_name }}</p>
-
-            <!-- SUMÁRIO EXECUTIVO -->
-            <div class="consulting-block">
-                <h2>Sumário Executivo Estratégico</h2>
-                <h3>Posicionamento de Mercado</h3>
-                <p>{{ analysis.executive_summary.market_positioning }}</p>
-                <h3>Fatores-Chave de Decisão</h3>
-                <p>{{ analysis.executive_summary.key_decision_factors }}</p>
-            </div>
-
-            <!-- SCORECARD CIRCULAR -->
-            <div class="scorecard-container">
-                <img src="{{ scorecard_path }}" width="280" alt="Scorecard Circular">
-            </div>
-
-            <!-- ANÁLISE DIMENSIONAL (BARRAS) -->
-            <div class="consulting-block">
-                <h2>Análise Dimensional</h2>
-                <img src="{{ radar_chart_path }}" width="100%" alt="Análise Dimensional em Barras" style="max-width: 600px; margin: 15pt 0;">
-            </div>
-
-            <!-- PONTUAÇÃO DETALHADA DO CURRÍCULO (CONDENSADO) -->
-            <div class="consulting-block score-summary">
-                <h2>Detalhes por Dimensão</h2>
-                <div class="score-item">
-                    <div class="score-item-header">
-                        <h4>Estrutura e Clareza</h4>
-                        <span class="score-item-value">{{ (analysis.radar_data.estrutura * 5)|int }}/100</span>
-                    </div>
-                    <p class="score-item-analysis">{{ analysis.content_structure_analysis.organization_hierarchy_signal }}</p>
-                    <p class="score-item-focus"><strong>Foco de Melhoria:</strong> {{ analysis.content_structure_analysis.organization_hierarchy_missing }}</p>
-                </div>
-                <div class="score-item">
-                    <div class="score-item-header">
-                        <h4>Conteúdo e Relevância</h4>
-                        <span class="score-item-value">{{ (analysis.radar_data.conteudo * 5)|int }}/100</span>
-                    </div>
-                    <p class="score-item-analysis">{{ analysis.content_structure_analysis.responsibilities_results_balance_signal }}</p>
-                    <p class="score-item-focus"><strong>Foco de Melhoria:</strong> {{ analysis.content_structure_analysis.responsibilities_results_balance_missing }}</p>
-                </div>
-                <div class="score-item">
-                    <div class="score-item-header">
-                        <h4>Compatibilidade ATS</h4>
-                        <span class="score-item-value">{{ (analysis.radar_data.ats * 5)|int }}/100</span>
-                    </div>
-                    <p class="score-item-analysis">{{ analysis.ats_digital_recruitment.compatibility_signal }}</p>
-                    <p class="score-item-focus"><strong>Foco de Melhoria:</strong> {{ analysis.ats_digital_recruitment.compatibility_missing }}</p>
-                </div>
-                <div class="score-item">
-                    <div class="score-item-header">
-                        <h4>Impacto e Resultados</h4>
-                        <span class="score-item-value">{{ (analysis.radar_data.impacto * 5)|int }}/100</span>
-                    </div>
-                    <p class="score-item-analysis">{{ analysis.diagnostic_impact.impact_strengths_signal }}</p>
-                    <p class="score-item-focus"><strong>Foco de Melhoria:</strong> {{ analysis.diagnostic_impact.impact_strengths_missing }}</p>
-                </div>
-                <div class="score-item">
-                    <div class="score-item-header">
-                        <h4>Marca Pessoal e Proposta de Valor</h4>
-                        <span class="score-item-value">{{ (analysis.radar_data.branding * 5)|int }}/100</span>
-                    </div>
-                    <p class="score-item-analysis">{{ analysis.skills_differentiation.differentiation_factors_signal }}</p>
-                    <p class="score-item-focus"><strong>Foco de Melhoria:</strong> {{ analysis.skills_differentiation.differentiation_factors_missing }}</p>
-                </div>
-                <div class="score-item">
-                    <div class="score-item-header">
-                        <h4>Riscos e Inconsistências</h4>
-                        <span class="score-item-value">{{ (analysis.radar_data.riscos * 5)|int }}/100</span>
-                    </div>
-                    <p class="score-item-analysis">{{ analysis.strategic_risks.identified_risks_signal }}</p>
-                    <p class="score-item-focus"><strong>Foco de Melhoria:</strong> {{ analysis.strategic_risks.identified_risks_missing }}</p>
-                </div>
-            </div>
-
-            <!-- DIAGNÓSTICO DE IMPACTO -->
-            <div class="consulting-block">
-                <h2>Diagnóstico de Impacto Profissional</h2>
-                <h3>Leitura em 30 Segundos por um Recrutador Sénior</h3>
-                <p>{{ analysis.diagnostic_impact.first_30_seconds_read }}</p>
-                <h3>Pontos Fortes de Impacto</h3>
-                <p>{{ analysis.diagnostic_impact.impact_strengths }}</p>
-                <h3>Pontos de Diluição de Impacto</h3>
-                <p>{{ analysis.diagnostic_impact.impact_dilutions }}</p>
-            </div>
-
-            <!-- ANÁLISE DE CONTEÚDO E ESTRUTURA -->
-            <div class="consulting-block">
-                <h2>Análise de Conteúdo e Estrutura</h2>
-                <h3>Organização e Hierarquia da Informação</h3>
-                <p>{{ analysis.content_structure_analysis.organization_hierarchy }}</p>
-                <h3>Equilíbrio entre Responsabilidades e Resultados</h3>
-                <p>{{ analysis.content_structure_analysis.responsibilities_results_balance }}</p>
-                <h3>Orientação do Currículo</h3>
-                <p>{{ analysis.content_structure_analysis.orientation }}</p>
-            </div>
-
-            <!-- ANÁLISE ATS E RECRUTAMENTO DIGITAL -->
-            <div class="consulting-block">
-                <h2>Análise ATS e Recrutamento Digital</h2>
-                <h3>Compatibilidade com Sistemas ATS</h3>
-                <p>{{ analysis.ats_digital_recruitment.compatibility }}</p>
-                <h3>Riscos de Filtragem Automática</h3>
-                <p>{{ analysis.ats_digital_recruitment.filtering_risks }}</p>
-                <h3>Alinhamento com Práticas de Recrutamento</h3>
-                <p>{{ analysis.ats_digital_recruitment.alignment }}</p>
-            </div>
+    """Gerador de relatórios PDF com design premium e análises aprofundadas."""
+    
+    def _convert_to_bullets(self, text):
+        """Converte texto com marcadores markdown para HTML com bullets."""
+        if not text:
+            return '<p class="no-items">Análise não disponível.</p>'
+        
+        import re
+        
+        # Converter **texto** para <strong>texto</strong>
+        text = re.sub(r'\*\*([^*]+)\*\*', r'<strong class="insight-key">\1</strong>', text)
+        
+        # Dividir por linhas
+        lines = text.strip().split('\n')
+        
+        html_parts = []
+        current_list = []
+        current_heading = None
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
             
-            <!-- COMO MELHORAR AS TUAS FRASES -->
-            <div class="consulting-block">
-                <h2>Como Melhorar as Tuas Frases</h2>
-                {% for item in analysis.pdf_extended_content.phrase_improvements %}
-                <div class="before-after-block">
-                    <div class="ba-label before-label">Antes (Original)</div>
-                    <p class="ba-text">"{{ item.original }}"</p>
-                    
-                    <div class="ba-label after-label">Depois (Melhorado)</div>
-                    <p class="ba-text">"{{ item.improved }}"</p>
+            # Verificar se é um heading (termina com :)
+            if line.endswith(':') and len(line) < 50:
+                # Fechar lista anterior se existir
+                if current_list:
+                    html_parts.append('<ul class="analysis-list">')
+                    html_parts.extend([f'<li>{item}</li>' for item in current_list])
+                    html_parts.append('</ul>')
+                    current_list = []
+                
+                current_heading = line
+                html_parts.append(f'<div style="font-weight: bold; color: #BF9A33; margin-top: 10pt; margin-bottom: 5pt;">{line}</div>')
+            
+            # Verificar se é um bullet (começa com - ou • ou *)
+            elif line.startswith(('-', '•', '*')):
+                bullet_text = line.lstrip('-•* ').strip()
+                if bullet_text:
+                    current_list.append(bullet_text)
+            
+            # Texto normal - adicionar como parágrafo ou bullet
+            else:
+                if current_list:
+                    current_list.append(line)
+                else:
+                    html_parts.append(f'<p style="margin-bottom: 8pt;">{line}</p>')
+        
+        # Fechar lista final se existir
+        if current_list:
+            html_parts.append('<ul class="analysis-list">')
+            html_parts.extend([f'<li>{item}</li>' for item in current_list])
+            html_parts.append('</ul>')
+        
+        return ''.join(html_parts) if html_parts else f'<p>{text}</p>'
+    
+    def _process_analysis_for_bullets(self, analysis_data):
+        """Processa todos os campos de análise textual para formato de bullets HTML."""
+        import copy
+        processed = copy.deepcopy(analysis_data)
+        
+        # Campos a processar para bullets
+        text_fields = [
+            ('executive_summary', 'market_positioning'),
+            ('executive_summary', 'key_decision_factors'),
+            ('diagnostic_impact', 'first_30_seconds_read'),
+            ('diagnostic_impact', 'impact_strengths'),
+            ('diagnostic_impact', 'impact_dilutions'),
+            ('content_structure_analysis', 'organization_hierarchy'),
+            ('content_structure_analysis', 'responsibilities_results_balance'),
+            ('content_structure_analysis', 'orientation'),
+            ('ats_digital_recruitment', 'compatibility'),
+            ('ats_digital_recruitment', 'filtering_risks'),
+            ('ats_digital_recruitment', 'alignment'),
+            ('skills_differentiation', 'technical_behavioral_analysis'),
+            ('skills_differentiation', 'differentiation_factors'),
+            ('skills_differentiation', 'common_undifferentiated'),
+            ('strategic_risks', 'identified_risks'),
+            ('languages_analysis', 'languages_assessment'),
+            ('education_analysis', 'education_assessment'),
+            ('priority_recommendations', 'immediate_adjustments'),
+            ('priority_recommendations', 'refinement_areas'),
+            ('priority_recommendations', 'deep_repositioning'),
+            ('market_analysis', 'sector_trends'),
+            ('market_analysis', 'competitive_landscape'),
+            ('market_analysis', 'opportunities_threats'),
+            ('final_conclusion', 'executive_synthesis'),
+            ('final_conclusion', 'next_steps'),
+        ]
+        
+        for section, field in text_fields:
+            if section in processed and field in processed[section]:
+                original_text = processed[section][field]
+                if isinstance(original_text, str) and len(original_text) > 50:
+                    processed[section][field] = self._convert_to_bullets(original_text)
+        
+        return processed
+    
+    def __init__(self):
+        self.colors = {
+            'gold': '#BF9A33',
+            'gold_light': '#D4B35A',
+            'black': '#1A1A1A',
+            'gray_dark': '#333333',
+            'gray_medium': '#6c757d',
+            'gray_light': '#e9ecef',
+            'gray_bg': '#f8f9fa',
+            'white': '#FFFFFF',
+            'success': '#27ae60',
+            'warning': '#f39c12',
+            'danger': '#e74c3c'
+        }
 
-                    <h3>Porquê esta mudança?</h3>
-                    <p>{{ item.explanation }}</p>
-                </div>
-                {% endfor %}
-            </div>
+    def _get_template(self):
+        return """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page {
+            size: A4;
+            margin: 1.5cm 1.5cm 2.5cm 1.5cm;
+        }
+        
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            color: #333333;
+            line-height: 1.5;
+            font-size: 10pt;
+        }
+        
+        h1 { font-size: 24pt; font-weight: bold; color: #1A1A1A; margin: 0 0 10pt 0; }
+        h2 { font-size: 14pt; font-weight: bold; color: #1A1A1A; margin: 20pt 0 10pt 0; border-left: 3pt solid #BF9A33; padding-left: 10pt; }
+        h3 { font-size: 11pt; font-weight: bold; color: #BF9A33; margin: 15pt 0 6pt 0; page-break-after: avoid; }
+        h4 { font-size: 10pt; font-weight: bold; color: #1A1A1A; margin: 10pt 0 4pt 0; }
+        
+        p { margin: 0 0 8pt 0; text-align: justify; }
+        
+        .text-gold { color: #BF9A33; }
+        .text-muted { color: #6c757d; }
+        .text-center { text-align: center; }
+        .text-small { font-size: 9pt; }
+        
+        .page-break { page-break-before: always; }
+        
+        /* Capa */
+        .cover { text-align: center; padding-top: 100pt; }
+        .cover-subtitle { font-size: 11pt; color: #BF9A33; letter-spacing: 2pt; margin-bottom: 40pt; }
+        .cover-title { font-size: 28pt; font-weight: bold; color: #1A1A1A; margin-bottom: 20pt; }
+        .cover-candidate { font-size: 16pt; font-weight: bold; color: #333333; margin-bottom: 10pt; }
+        .cover-id { font-size: 9pt; color: #6c757d; margin-bottom: 60pt; }
+        .cover-date { font-size: 10pt; color: #6c757d; }
+        .cover-tagline { font-size: 10pt; color: #BF9A33; margin-top: 5pt; }
+        
+        /* Header */
+        .page-header { border-bottom: 1pt solid #e9ecef; padding-bottom: 8pt; margin-bottom: 15pt; }
+        .header-text { font-size: 8pt; color: #adb5bd; text-align: right; }
+        
+        /* Profile Grid */
+        .profile-table { width: 100%; border-collapse: collapse; margin: 15pt 0; }
+        .profile-table td { padding: 10pt; border: 1pt solid #e9ecef; vertical-align: top; }
+        .profile-label { font-size: 8pt; color: #BF9A33; text-transform: uppercase; margin-bottom: 3pt; }
+        .profile-value { font-size: 11pt; font-weight: bold; color: #1A1A1A; }
+        
+        /* Scorecard */
+        .scorecard-container { text-align: center; margin: 20pt 0; }
+        .mini-scorecard-row { text-align: center; margin: 15pt 0; }
+        .mini-scorecard { display: inline-block; width: 80pt; text-align: center; margin: 0 5pt; }
+        .scorecard-label { font-size: 8pt; color: #6c757d; text-transform: uppercase; margin-top: 5pt; }
+        
+        /* Dimension Item */
+        .dimension-item { margin-bottom: 20pt; }
+        .dimension-header { background: #BF9A33; padding: 10pt 15pt; margin-bottom: 10pt; }
+        .dimension-title { font-size: 12pt; font-weight: bold; color: #FFFFFF; display: inline-block; }
+        .dimension-score { font-size: 14pt; font-weight: bold; color: #FFFFFF; float: right; }
+        .dimension-analysis { font-size: 9.5pt; color: #495057; padding: 0 5pt; }
+        .dimension-focus { font-size: 9pt; color: #6c757d; margin-top: 6pt; padding: 8pt; background: #f8f9fa; border-left: 2pt solid #BF9A33; }
+        
+        /* Before/After - Novo Layout */
+        .example-item { margin-bottom: 15pt; padding-bottom: 15pt; border-bottom: 1pt solid #e9ecef; page-break-inside: avoid; }
+        .example-item:last-child { border-bottom: none; }
+        .example-title { font-size: 11pt; font-weight: bold; color: #BF9A33; margin-bottom: 10pt; }
+        .example-columns { width: 100%; }
+        .example-columns td { width: 50%; vertical-align: top; padding: 5pt; }
+        .ba-label { font-size: 9pt; font-weight: bold; color: #1A1A1A; margin-bottom: 4pt; }
+        .ba-text { font-style: italic; color: #495057; font-size: 9.5pt; padding: 8pt; background: #f8f9fa; border: 1pt solid #e9ecef; }
+        .racional-section { margin-top: 10pt; }
+        .racional-label { font-size: 9pt; font-weight: bold; color: #1A1A1A; margin-bottom: 4pt; }
+        .racional-text { font-size: 9pt; color: #495057; text-align: justify; }
+        
+        /* Certification */
+        .cert-item { margin-bottom: 12pt; padding: 10pt; border: 1pt solid #e9ecef; }
+        .cert-name { font-size: 11pt; font-weight: bold; color: #1A1A1A; }
+        .cert-priority { font-size: 9pt; font-weight: bold; float: right; }
+        .cert-issuer { font-size: 9pt; color: #BF9A33; margin: 4pt 0; }
+        .cert-relevance { font-size: 9.5pt; color: #495057; }
+        .priority-alta { color: #e74c3c; }
+        .priority-media { color: #f39c12; }
+        .priority-baixa { color: #27ae60; }
+        
+        /* Recommendation */
+        .recommendation-item { margin-bottom: 12pt; padding: 10pt; background: #f8f9fa; border-left: 3pt solid #BF9A33; }
+        .recommendation-priority { font-size: 8pt; font-weight: bold; text-transform: uppercase; margin-bottom: 4pt; }
+        
+        /* Services */
+        .services-table { width: 100%; border-collapse: collapse; margin: 15pt 0; }
+        .services-table td { width: 33%; padding: 12pt; text-align: center; vertical-align: top; border: 1pt solid #e9ecef; }
+        .service-icon { font-size: 20pt; color: #BF9A33; margin-bottom: 8pt; }
+        .service-title { font-size: 11pt; font-weight: bold; color: #1A1A1A; margin-bottom: 6pt; }
+        .service-desc { font-size: 9pt; color: #6c757d; }
+        .service-link { font-size: 9pt; color: #BF9A33; font-weight: bold; margin-top: 8pt; }
+        
+        /* Footer */
+        .page-footer { position: fixed; bottom: 0; left: 0; right: 0; font-size: 7pt; color: #adb5bd; padding: 8pt 0; }
+        .page-footer-table { width: 100%; border-collapse: collapse; }
+        .page-footer-table td { padding: 0; }
+        .footer-left { text-align: left; }
+        .footer-center { text-align: center; }
+        .footer-right { text-align: right; }
+        
+        /* Clear float */
+        .clearfix { clear: both; }
+        
+        /* Analysis Lists */
+        .analysis-list { margin: 8pt 0; padding-left: 0; }
+        .analysis-list li { margin-bottom: 6pt; font-size: 9.5pt; color: #495057; list-style-type: none; padding-left: 15pt; position: relative; }
+        .analysis-list li:before { content: "●"; color: #BF9A33; font-size: 8pt; position: absolute; left: 0; top: 2pt; }
+        .insight-key { font-weight: bold; color: #1A1A1A; }
+        .insight-highlight { background: #FFF9E6; padding: 1pt 4pt; }
+        
+        /* No items message */
+        .no-items { font-style: italic; color: #6c757d; padding: 10pt; background: #f8f9fa; text-align: center; }
+        
+        /* Analysis Content - keep with title */
+        .analysis-content { font-size: 9.5pt; color: #495057; text-align: justify; }
+        .analysis-section { page-break-inside: avoid; }
+    </style>
+</head>
+<body>
 
-            <!-- RECOMENDAÇÕES PRIORITÁRIAS -->
-            <div class="consulting-block">
-                <h2>Recomendações Prioritárias</h2>
-                <h3>Ajustes Imediatos</h3>
-                <p>{{ analysis.priority_recommendations.immediate_adjustments }}</p>
-                <h3>Áreas de Refinamento</h3>
-                <p>{{ analysis.priority_recommendations.refinement_areas }}</p>
-                <h3>Reposicionamento Profundo</h3>
-                <p>{{ analysis.priority_recommendations.deep_repositioning }}</p>
-            </div>
+<!-- CAPA -->
+<div style="text-align: center; page-break-after: always;">
+    <div style="padding-top: 120pt;">
+        <div style="font-size: 10pt; color: #BF9A33; letter-spacing: 2pt;">POSICIONAMENTO DE CARREIRA</div>
+    </div>
+    <div style="font-size: 26pt; font-weight: bold; color: #1A1A1A; margin-top: 60pt;">RELATÓRIO DE ANÁLISE DE CV</div>
+    <div style="font-size: 16pt; font-weight: bold; color: #333333; margin-top: 80pt;">{{ candidate_name }}</div>
+    <div style="font-size: 9pt; color: #6c757d; margin-top: 80pt;">ID: {{ report_id }}</div>
+    <div style="font-size: 9pt; color: #6c757d; margin-top: 5pt;">Gerado em: {{ date_formatted }}</div>
+    <div style="font-size: 9pt; color: #BF9A33; margin-top: 80pt;">Human Centred Career & Knowledge Platform</div>
+    <div style="font-size: 8pt; color: #adb5bd; margin-top: 10pt;">Relatório de Análise de CV - Share2Inspire | Privado e Confidencial</div>
+</div>
 
-            <!-- CONCLUSÃO EXECUTIVA -->
-            <div class="consulting-block">
-                <h2>Conclusão Executiva</h2>
-                <h3>Potencial Após Melhorias</h3>
-                <p>{{ analysis.executive_conclusion.potential_after_improvements }}</p>
-                <h3>Competitividade Esperada</h3>
-                <p>{{ analysis.executive_conclusion.expected_competitiveness }}</p>
-            </div>
+<!-- PÁGINA 2: VISÃO GERAL -->
 
-            <!-- PRÓXIMOS PASSOS -->
-            <div class="next-steps-container">
-                <h2>A tua jornada para uma carreira de impacto continua aqui.</h2>
-                <div class="services-grid">
-                    <div class="service-block">
-                        <h4>Kickstart Pro</h4>
-                        <p>Sessão estratégica de 1h para decisões críticas de carreira.</p>
-                    </div>
-                    <div class="service-block">
-                        <h4>Revisão de CV</h4>
-                        <p>Feedback humano especializado com reescrita completa.</p>
-                    </div>
-                    <div class="service-block">
-                        <h4>CV Analyzer</h4>
-                        <p>Novos diagnósticos após implementares as melhorias.</p>
-                    </div>
-                </div>
-            </div>
+<div class="page-header">
+    <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
+</div>
 
-            <!-- FOOTER -->
-            <div id="footer_content" class="footer">
-                Share2Inspire | Relatório de Análise de CV | Confidencial
-            </div>
+<h2>Visão Geral e Maturidade</h2>
 
-        </body>
-        </html>
-        """
+<table class="profile-table">
+    <tr>
+        <td style="width: 50%;">
+            <div class="profile-label">Candidato</div>
+            <div class="profile-value">{{ candidate_name }}</div>
+        </td>
+        <td style="width: 50%;">
+            <div class="profile-label">Anos de Experiência</div>
+            <div class="profile-value">{{ analysis.candidate_profile.total_years_exp | default('N/D') }}</div>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <div class="profile-label">Função Atual</div>
+            <div class="profile-value">{{ analysis.candidate_profile.detected_role | default('N/D') }}</div>
+        </td>
+        <td>
+            <div class="profile-label">Senioridade</div>
+            <div class="profile-value">{{ analysis.candidate_profile.seniority | default('N/D') }}</div>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <div class="profile-label">Setor Principal</div>
+            <div class="profile-value">{{ analysis.candidate_profile.detected_sector | default('N/D') }}</div>
+        </td>
+        <td>
+            <div class="profile-label">Formação Académica</div>
+            <div class="profile-value">{{ analysis.candidate_profile.education_level | default('N/D') }}</div>
+        </td>
+    </tr>
+</table>
 
-    def create_pdf(self, analysis_data, radar_chart_path):
-        """Gera o PDF a partir dos dados de análise e do gráfico de radar."""
+<!-- SCORECARD E ANÁLISE GLOBAL LADO A LADO -->
+<table style="width: 100%; margin: 10pt 0; border-collapse: collapse;">
+    <tr>
+        <td style="width: 35%; vertical-align: top; text-align: center;">
+            <img src="{{ main_scorecard }}" width="140" alt="Score Global">
+        </td>
+        <td style="width: 65%; vertical-align: top;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="width: 50%; vertical-align: top; padding-right: 10pt;">
+                        <div style="font-size: 9pt; font-weight: bold; color: #BF9A33; margin-bottom: 6pt; border-bottom: 1pt solid #BF9A33; padding-bottom: 3pt;">Pontos Fortes</div>
+                        <ul style="font-size: 8pt; color: #333333; margin: 0; padding-left: 12pt; line-height: 1.4;">
+                        {% for ponto in analysis.global_summary.strengths[:4] %}
+                            <li style="margin-bottom: 4pt;">{{ ponto }}</li>
+                        {% else %}
+                            <li style="margin-bottom: 4pt;">Trajetória profissional consistente</li>
+                            <li style="margin-bottom: 4pt;">Experiência em organizações de referência</li>
+                            <li style="margin-bottom: 4pt;">Formação académica alinhada</li>
+                        {% endfor %}
+                        </ul>
+                    </td>
+                    <td style="width: 50%; vertical-align: top; padding-left: 10pt;">
+                        <div style="font-size: 9pt; font-weight: bold; color: #1A1A1A; margin-bottom: 6pt; border-bottom: 1pt solid #1A1A1A; padding-bottom: 3pt;">Oportunidades de Melhoria</div>
+                        <ul style="font-size: 8pt; color: #333333; margin: 0; padding-left: 12pt; line-height: 1.4;">
+                        {% for oportunidade in analysis.global_summary.improvements[:4] %}
+                            <li style="margin-bottom: 4pt;">{{ oportunidade }}</li>
+                        {% else %}
+                            <li style="margin-bottom: 4pt;">Quantificar resultados com métricas</li>
+                            <li style="margin-bottom: 4pt;">Reforçar keywords para ATS</li>
+                            <li style="margin-bottom: 4pt;">Articular proposta de valor</li>
+                        {% endfor %}
+                        </ul>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+
+
+<!-- PÁGINA 3: SUMÁRIO EXECUTIVO -->
+<div class="page-break"></div>
+
+<div class="page-header">
+    <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
+</div>
+
+<h2>Sumário Executivo Estratégico</h2>
+
+<div class="analysis-section">
+<h3>Posicionamento de Mercado</h3>
+<div class="analysis-content">{{ analysis.executive_summary.market_positioning | default('Análise não disponível.') | safe }}</div>
+</div>
+
+<div class="analysis-section">
+<h3>Fatores-Chave de Decisão</h3>
+<div class="analysis-content">{{ analysis.executive_summary.key_decision_factors | default('Análise não disponível.') | safe }}</div>
+</div>
+
+<!-- PÁGINA 4: ANÁLISE DIMENSIONAL - GRÁFICO -->
+<div class="page-break"></div>
+
+<div class="page-header">
+    <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
+</div>
+
+<h2>Análise por Dimensão</h2>
+
+<!-- Gráfico de Barras -->
+<div style="text-align: center; margin: 20pt 0;">
+    <img src="{{ bar_chart }}" width="500" alt="Análise Dimensional">
+</div>
+
+<p class="text-muted" style="text-align: center; margin-top: 20pt;">As páginas seguintes apresentam a análise detalhada de cada dimensão avaliada.</p>
+
+<!-- PÁGINA 5: ESTRUTURA E CONTEÚDO -->
+<div class="page-break"></div>
+
+<div class="page-header">
+    <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
+</div>
+
+<h2>Análise por Dimensão</h2>
+
+<!-- Estrutura -->
+<div class="dimension-item">
+    <div class="dimension-header">
+        <span class="dimension-title">Estrutura e Clareza</span>
+        <span class="dimension-score">{{ scores.estrutura }}/100</span>
+        <div class="clearfix"></div>
+    </div>
+    <div class="dimension-analysis">{{ analysis.content_structure_analysis.organization_hierarchy | default('Análise não disponível.') | safe }}</div>
+</div>
+
+<!-- Conteúdo -->
+<div class="dimension-item">
+    <div class="dimension-header">
+        <span class="dimension-title">Conteúdo e Relevância</span>
+        <span class="dimension-score">{{ scores.conteudo }}/100</span>
+        <div class="clearfix"></div>
+    </div>
+    <div class="dimension-analysis">{{ analysis.content_structure_analysis.responsibilities_results_balance | default('Análise não disponível.') | safe }}</div>
+</div>
+
+<!-- PÁGINA 6: CONSISTÊNCIA E ATS -->
+<div class="page-break"></div>
+
+<div class="page-header">
+    <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
+</div>
+
+<h2>Análise por Dimensão (Continuação)</h2>
+
+<!-- Consistência -->
+<div class="dimension-item">
+    <div class="dimension-header">
+        <span class="dimension-title">Consistência e Coerência</span>
+        <span class="dimension-score">{{ scores.consistencia }}/100</span>
+        <div class="clearfix"></div>
+    </div>
+    <div class="dimension-analysis">{{ analysis.strategic_risks.identified_risks | default('Análise não disponível.') | safe }}</div>
+</div>
+
+<!-- ATS -->
+<div class="dimension-item">
+    <div class="dimension-header">
+        <span class="dimension-title">Compatibilidade ATS</span>
+        <span class="dimension-score">{{ scores.ats }}/100</span>
+        <div class="clearfix"></div>
+    </div>
+    <div class="dimension-analysis">{{ analysis.ats_digital_recruitment.compatibility | default('Análise não disponível.') | safe }}</div>
+</div>
+
+<!-- PÁGINA 7: IMPACTO E BRANDING -->
+<div class="page-break"></div>
+
+<div class="page-header">
+    <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
+</div>
+
+<h2>Análise por Dimensão (Continuação)</h2>
+
+<!-- Impacto -->
+<div class="dimension-item">
+    <div class="dimension-header">
+        <span class="dimension-title">Impacto e Resultados</span>
+        <span class="dimension-score">{{ scores.impacto }}/100</span>
+        <div class="clearfix"></div>
+    </div>
+    <div class="dimension-analysis">{{ analysis.diagnostic_impact.impact_strengths | default('Análise não disponível.') | safe }}</div>
+</div>
+
+<!-- Branding -->
+<div class="dimension-item">
+    <div class="dimension-header">
+        <span class="dimension-title">Marca Pessoal e Proposta de Valor</span>
+        <span class="dimension-score">{{ scores.branding }}/100</span>
+        <div class="clearfix"></div>
+    </div>
+    <div class="dimension-analysis">{{ analysis.skills_differentiation.differentiation_factors | default('Análise não disponível.') | safe }}</div>
+</div>
+
+<!-- PÁGINA 6: DIAGNÓSTICO DE IMPACTO -->
+<div class="page-break"></div>
+
+<div class="page-header">
+    <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
+</div>
+
+<h2>Diagnóstico de Impacto Profissional</h2>
+
+<div class="analysis-section">
+<h3>Leitura em 30 Segundos por um Recrutador Sénior</h3>
+<div class="analysis-content">{{ analysis.diagnostic_impact.first_30_seconds_read | default('Análise não disponível.') | safe }}</div>
+</div>
+
+<div class="analysis-section">
+<h3>Pontos Fortes de Impacto</h3>
+<div class="analysis-content">{{ analysis.diagnostic_impact.impact_strengths | default('Análise não disponível.') | safe }}</div>
+</div>
+
+<div class="analysis-section">
+<h3>Pontos de Diluição de Impacto</h3>
+<div class="analysis-content">{{ analysis.diagnostic_impact.impact_dilutions | default('Análise não disponível.') | safe }}</div>
+</div>
+
+<!-- PÁGINA 7: ANÁLISE ATS -->
+<div class="page-break"></div>
+
+<div class="page-header">
+    <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
+</div>
+
+<h2>Análise ATS e Recrutamento Digital</h2>
+
+<div class="analysis-section">
+<h3>Compatibilidade com Sistemas ATS</h3>
+<div class="analysis-content">{{ analysis.ats_digital_recruitment.compatibility | default('Análise não disponível.') | safe }}</div>
+</div>
+
+<div class="analysis-section">
+<h3>Riscos de Filtragem Automática</h3>
+<div class="analysis-content">{{ analysis.ats_digital_recruitment.filtering_risks | default('Análise não disponível.') | safe }}</div>
+</div>
+
+<div class="analysis-section">
+<h3>Alinhamento com Práticas de Recrutamento</h3>
+<div class="analysis-content">{{ analysis.ats_digital_recruitment.alignment | default('Análise não disponível.') | safe }}</div>
+</div>
+
+<!-- PÁGINA 8: MELHORIAS DE FRASES -->
+<div class="page-break"></div>
+
+<div class="page-header">
+    <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
+</div>
+
+<h2>Exemplos de Melhoria de Frases</h2>
+
+{% for item in analysis.phrase_improvements %}
+<div class="example-item">
+    <div class="example-title">{{ loop.index }}. {{ item.category | default('Melhoria de Frase') }}</div>
+    
+    <table class="example-columns">
+        <tr>
+            <td>
+                <div class="ba-label">Antes</div>
+                <div class="ba-text">"{{ item.before }}"</div>
+            </td>
+            <td>
+                <div class="ba-label">Depois</div>
+                <div class="ba-text">"{{ item.after }}"</div>
+            </td>
+        </tr>
+    </table>
+    
+    <div class="racional-section">
+        <div class="racional-label">Racional</div>
+        <div class="racional-text">{{ item.justification }}</div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- PÁGINA 9: ANÁLISE DE MERCADO -->
+<div class="page-break"></div>
+
+<div class="page-header">
+    <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
+</div>
+
+<h2>Análise de Mercado e Posicionamento</h2>
+
+<div class="analysis-section">
+<h3>Contexto: {{ analysis.pdf_extended_content.sector_analysis.identified_sector | default('Setor não identificado') }}</h3>
+<div class="analysis-content">{{ analysis.pdf_extended_content.sector_analysis.sector_trends | default('Análise de tendências não disponível.') | safe }}</div>
+</div>
+
+<div class="analysis-section">
+<h3>Panorama Competitivo</h3>
+<div class="analysis-content">{{ analysis.pdf_extended_content.sector_analysis.competitive_landscape | default('Análise competitiva não disponível.') | safe }}</div>
+</div>
+
+<!-- PÁGINA 10: CERTIFICAÇÕES RECOMENDADAS -->
+<div class="page-break"></div>
+
+<div class="page-header">
+    <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
+</div>
+
+<h2>Certificações Recomendadas</h2>
+
+{% for cert in analysis.pdf_extended_content.critical_certifications %}
+<div class="cert-item">
+    <span class="cert-priority priority-{{ cert.priority | lower }}">{{ cert.priority }}</span>
+    <div class="cert-name">{{ cert.name }}</div>
+    <div class="clearfix"></div>
+    <div class="cert-issuer">{{ cert.issuer }} | {{ cert.estimated_investment | default('Investimento variável') }}</div>
+    <p class="cert-relevance">{{ cert.relevance | truncate(300) }}</p>
+</div>
+{% endfor %}
+
+<!-- PÁGINA 11: RECOMENDAÇÕES PRIORITÁRIAS -->
+<div class="page-break"></div>
+
+<div class="page-header">
+    <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
+</div>
+
+<h2>Recomendações Prioritárias</h2>
+
+<div class="recommendation-item">
+    <div class="recommendation-priority" style="color: #e74c3c;">Ajustes Imediatos</div>
+    <div class="analysis-content">{{ analysis.priority_recommendations.immediate_adjustments | default('Recomendações não disponíveis.') | safe }}</div>
+</div>
+
+<div class="recommendation-item">
+    <div class="recommendation-priority" style="color: #f39c12;">Áreas de Refinamento</div>
+    <div class="analysis-content">{{ analysis.priority_recommendations.refinement_areas | default('Recomendações não disponíveis.') | safe }}</div>
+</div>
+
+<div class="recommendation-item">
+    <div class="recommendation-priority" style="color: #27ae60;">Reposicionamento Profundo</div>
+    <div class="analysis-content">{{ analysis.priority_recommendations.deep_repositioning | default('Recomendações não disponíveis.') | safe }}</div>
+</div>
+
+<!-- PÁGINA 12: CONCLUSÃO E SERVIÇOS -->
+<div class="page-break"></div>
+
+<div class="page-header">
+    <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
+</div>
+
+<h2>Conclusão Executiva</h2>
+
+<div class="analysis-section">
+<h3>Potencial Após Melhorias</h3>
+<div class="analysis-content">{{ analysis.executive_conclusion.potential_after_improvements | default('Conclusão não disponível.') | safe }}</div>
+</div>
+
+<div class="analysis-section">
+<h3>Competitividade Esperada</h3>
+<div class="analysis-content">{{ analysis.executive_conclusion.expected_competitiveness | default('Análise não disponível.') | safe }}</div>
+</div>
+
+<!-- PÁGINA SEPARADA: OUTROS SERVIÇOS -->
+<div class="page-break"></div>
+
+<div class="page-header">
+    <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
+</div>
+
+<h2>Outros Serviços Share2Inspire</h2>
+
+<p class="text-muted">A sua jornada para uma carreira de impacto continua aqui. Potencie o seu percurso com as nossas soluções dedicadas.</p>
+
+<table class="services-table">
+    <tr>
+        <td>
+            <div class="service-icon">⚡</div>
+            <div class="service-title">Kickstart Pro</div>
+            <div class="service-desc">Sessão estratégica de 1h para desbloquear decisões críticas de carreira.</div>
+            <div class="service-link">Saber Mais →</div>
+        </td>
+        <td>
+            <div class="service-icon">★</div>
+            <div class="service-title">Mentoria de Carreira</div>
+            <div class="service-desc">Programa de acompanhamento personalizado para objetivos ambiciosos.</div>
+            <div class="service-link">Saber Mais →</div>
+        </td>
+        <td>
+            <div class="service-icon">◎</div>
+            <div class="service-title">Revisão de LinkedIn</div>
+            <div class="service-desc">Otimização do perfil para máxima visibilidade e atração de recrutadores.</div>
+            <div class="service-link">Saber Mais →</div>
+        </td>
+    </tr>
+</table>
+
+<!-- FOOTER FINAL -->
+<div style="text-align: center; margin-top: 30pt; padding-top: 15pt; border-top: 1pt solid #e9ecef;">
+    <p class="text-muted text-small">Human Centred Career & Knowledge Platform</p>
+    <p class="text-muted text-small">www.share2inspire.pt | srshare2inspire@gmail.com</p>
+</div>
+
+<div class="page-footer">
+    <table class="page-footer-table">
+        <tr>
+            <td class="footer-left">{{ candidate_name }}</td>
+            <td class="footer-center">Relatório de Análise de CV</td>
+            <td class="footer-right">Share2Inspire | share2inspire.pt</td>
+        </tr>
+    </table>
+</div>
+
+</body>
+</html>
+"""
+
+    def generate_circular_scorecard(self, score, size=200, label="SCORE GERAL", show_label=True):
+        """Gera um scorecard circular SVG elegante."""
+        center = size / 2
+        radius = center * 0.75
+        stroke_width = size * 0.06
+        
+        circumference = 2 * math.pi * radius
+        score_normalized = min(max(score, 0), 100) / 100
+        dash_length = circumference * score_normalized
+        
+        if score >= 75:
+            score_color = self.colors['success']
+        elif score >= 50:
+            score_color = self.colors['gold']
+        elif score >= 25:
+            score_color = self.colors['warning']
+        else:
+            score_color = self.colors['danger']
+        
+        svg = f'''<svg width="{size}" height="{size}" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="{self.colors['white']}"/>
+            <circle cx="{center}" cy="{center}" r="{radius}" fill="none" stroke="{self.colors['gray_light']}" stroke-width="{stroke_width}"/>
+            <circle cx="{center}" cy="{center}" r="{radius}" fill="none" stroke="{score_color}" stroke-width="{stroke_width}" stroke-dasharray="{dash_length} {circumference}" stroke-linecap="round" transform="rotate(-90 {center} {center})"/>
+            <circle cx="{center}" cy="{center}" r="{radius * 0.6}" fill="{self.colors['white']}"/>
+            <text x="{center}" y="{center - (size * 0.05)}" font-family="Helvetica, Arial, sans-serif" font-size="{size * 0.22}" fill="{self.colors['black']}" text-anchor="middle" font-weight="bold">{int(score)}</text>
+            <text x="{center}" y="{center + (size * 0.08)}" font-family="Helvetica, Arial, sans-serif" font-size="{size * 0.08}" fill="{self.colors['gray_medium']}" text-anchor="middle">/100</text>'''
+        
+        if show_label:
+            svg += f'''<text x="{center}" y="{center + (size * 0.25)}" font-family="Helvetica, Arial, sans-serif" font-size="{size * 0.055}" fill="{self.colors['black']}" text-anchor="middle" font-weight="bold">{label}</text>'''
+        
+        svg += '</svg>'
+        return svg
+
+    def generate_mini_scorecard(self, score, size=70):
+        """Gera um mini scorecard circular para as dimensões."""
+        center = size / 2
+        radius = center * 0.75
+        stroke_width = size * 0.08
+        
+        circumference = 2 * math.pi * radius
+        score_normalized = min(max(score, 0), 100) / 100
+        dash_length = circumference * score_normalized
+        
+        svg = f'''<svg width="{size}" height="{size}" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="{center}" cy="{center}" r="{radius}" fill="none" stroke="{self.colors['gray_light']}" stroke-width="{stroke_width}"/>
+            <circle cx="{center}" cy="{center}" r="{radius}" fill="none" stroke="{self.colors['gold']}" stroke-width="{stroke_width}" stroke-dasharray="{dash_length} {circumference}" stroke-linecap="round" transform="rotate(-90 {center} {center})"/>
+            <circle cx="{center}" cy="{center}" r="{radius * 0.55}" fill="{self.colors['white']}"/>
+            <text x="{center}" y="{center + (size * 0.1)}" font-family="Helvetica, Arial, sans-serif" font-size="{size * 0.28}" fill="{self.colors['black']}" text-anchor="middle" font-weight="bold">{int(score)}</text>
+        </svg>'''
+        return svg
+
+    def generate_bar_chart(self, radar_data):
+        """Gera um gráfico de barras horizontais SVG elegante - versão grande para página inteira."""
+        # Ordem fixa consistente com os scorecards
+        ordered_keys = ['estrutura', 'conteudo', 'riscos', 'ats', 'impacto', 'branding']
+        label_mapping = {
+            'estrutura': 'Estrutura & Clareza',
+            'conteudo': 'Conteúdo & Relevância',
+            'riscos': 'Consistência',
+            'ats': 'Compatibilidade ATS',
+            'impacto': 'Impacto & Resultados',
+            'branding': 'Marca Pessoal'
+        }
+        
+        labels = [label_mapping.get(k, k.capitalize()) for k in ordered_keys if k in radar_data]
+        values = [min(radar_data.get(k, 0) * 5, 100) for k in ordered_keys if k in radar_data]
+        num_bars = len(labels)
+
+        # Tamanho grande para ocupar a página
+        svg_width = 520
+        svg_height = 60 + (num_bars * 80)  # Aumentado de 40 para 80
+        bar_height = 35  # Aumentado de 22 para 35
+        margin_left = 180  # Aumentado para labels maiores
+        margin_right = 50
+
+        svg = f'<svg width="{svg_width}" height="{svg_height}" xmlns="http://www.w3.org/2000/svg">'
+        svg += f'<rect width="100%" height="100%" fill="{self.colors["white"]}"/>'
+
+        total_bar_width = svg_width - margin_left - margin_right
+
+        for i, (label, value) in enumerate(zip(labels, values)):
+            y_pos = 30 + (i * 80)  # Aumentado espaçamento
+            
+            # Barra de fundo
+            svg += f'<rect x="{margin_left}" y="{y_pos}" width="{total_bar_width}" height="{bar_height}" fill="{self.colors["gray_light"]}" rx="4"/>'
+            # Barra de score
+            score_bar_width = (total_bar_width / 100) * value
+            svg += f'<rect x="{margin_left}" y="{y_pos}" width="{score_bar_width}" height="{bar_height}" fill="{self.colors["gold"]}" rx="4"/>'
+            # Label
+            svg += f'<text x="{margin_left - 12}" y="{y_pos + bar_height / 2 + 5}" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="{self.colors["black"]}" text-anchor="end" font-weight="bold">{label}</text>'
+            # Score
+            svg += f'<text x="{margin_left + total_bar_width + 12}" y="{y_pos + bar_height / 2 + 5}" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="{self.colors["gold"]}" font-weight="bold">{int(value)}</text>'
+
+        svg += '</svg>'
+        return svg
+
+    def create_pdf(self, analysis_data, radar_chart_path=None):
+        """Gera o PDF a partir dos dados de análise."""
         if not analysis_data or 'candidate_profile' not in analysis_data:
             raise ValueError("Dados de análise inválidos ou incompletos.")
 
-        # Calcular score geral
-        radar_data = analysis_data.get('radar_data', {})
-        overall_score = sum(radar_data.values()) / len(radar_data) * 5 if radar_data else 0
-        
-        # Gerar scorecard circular
-        scorecard_svg = self.generate_scorecard_circular(overall_score)
-        import base64
-        scorecard_path = f"data:image/svg+xml;base64,{base64.b64encode(scorecard_svg.encode()).decode()}"
-
-        template = Template(self.template_html)
         candidate_name = analysis_data.get('candidate_profile', {}).get('detected_name', 'Candidato')
-        date_formatted = datetime.datetime.now().strftime("%d.%m.%Y")
+        radar_data = analysis_data.get('radar_data', {})
+        
+        scores = {
+            'estrutura': min(radar_data.get('estrutura', 0) * 5, 100),
+            'conteudo': min(radar_data.get('conteudo', 0) * 5, 100),
+            'consistencia': min(radar_data.get('riscos', 0) * 5, 100),  # Riscos invertido para Consistência
+            'ats': min(radar_data.get('ats', 0) * 5, 100),
+            'impacto': min(radar_data.get('impacto', 0) * 5, 100),
+            'branding': min(radar_data.get('branding', 0) * 5, 100)
+        }
+        
+        overall_score = sum(scores.values()) / len(scores) if scores else 0
+        
+        main_scorecard_svg = self.generate_circular_scorecard(overall_score, size=180, label="SCORE GLOBAL")
+        main_scorecard = f"data:image/svg+xml;base64,{base64.b64encode(main_scorecard_svg.encode()).decode()}"
+        
+        scorecard_estrutura = f"data:image/svg+xml;base64,{base64.b64encode(self.generate_mini_scorecard(scores['estrutura'], 60).encode()).decode()}"
+        scorecard_conteudo = f"data:image/svg+xml;base64,{base64.b64encode(self.generate_mini_scorecard(scores['conteudo'], 60).encode()).decode()}"
+        scorecard_consistencia = f"data:image/svg+xml;base64,{base64.b64encode(self.generate_mini_scorecard(scores['consistencia'], 60).encode()).decode()}"
+        scorecard_ats = f"data:image/svg+xml;base64,{base64.b64encode(self.generate_mini_scorecard(scores['ats'], 60).encode()).decode()}"
+        scorecard_impacto = f"data:image/svg+xml;base64,{base64.b64encode(self.generate_mini_scorecard(scores['impacto'], 60).encode()).decode()}"
+        scorecard_branding = f"data:image/svg+xml;base64,{base64.b64encode(self.generate_mini_scorecard(scores['branding'], 60).encode()).decode()}"
+        
+        bar_chart_svg = self.generate_bar_chart(radar_data)
+        bar_chart = f"data:image/svg+xml;base64,{base64.b64encode(bar_chart_svg.encode()).decode()}"
+        
+        now = datetime.datetime.now()
+        report_id = f"CVA {now.strftime('%Y %m %d %H %M')}"
+        date_formatted = now.strftime("%d/%m/%Y %H:%M")
+
+        # Processar campos de análise para formato de bullets
+        processed_analysis = self._process_analysis_for_bullets(analysis_data)
+        
+        template = Template(self._get_template())
         html = template.render(
-            analysis=analysis_data, 
-            radar_chart_path=radar_chart_path, 
-            scorecard_path=scorecard_path, 
-            now=datetime.datetime.now(),
+            analysis=processed_analysis,
             candidate_name=candidate_name,
-            date_formatted=date_formatted
+            report_id=report_id,
+            date_formatted=date_formatted,
+            scores=scores,
+            main_scorecard=main_scorecard,
+            scorecard_estrutura=scorecard_estrutura,
+            scorecard_conteudo=scorecard_conteudo,
+            scorecard_consistencia=scorecard_consistencia,
+            scorecard_ats=scorecard_ats,
+            scorecard_impacto=scorecard_impacto,
+            scorecard_branding=scorecard_branding,
+            bar_chart=bar_chart
         )
 
         pdf_buffer = io.BytesIO()
@@ -384,97 +847,11 @@ class ReportPDFGenerator:
             raise Exception(f"Erro ao gerar PDF: {pisa_status.err}")
 
         pdf_buffer.seek(0)
-        return pdf_buffer, f"Relatorio_Analise_CV_{analysis_data['candidate_profile']['detected_name'].replace(' ', '_')}.pdf"
+        filename = f"Relatorio_Analise_CV_{candidate_name.replace(' ', '_')}.pdf"
+        return pdf_buffer, filename
 
-    def generate_scorecard_circular(self, overall_score):
-        """Gera um scorecard circular SVG com o score total no limite dourado."""
-        
-        size = 280
-        center = size / 2
-        radius = center * 0.75
-        
-        # Ângulo do score (0-360 graus, começando no topo)
-        angle_percent = overall_score / 100.0
-        angle_rad = (angle_percent * 360 - 90) * (3.14159 / 180)
-        
-        # Ponto final do arco
-        end_x = center + radius * (3.14159 / 180) * angle_percent * 360
-        end_y = center + radius * (3.14159 / 180) * angle_percent * 360
-        
-        svg = f'<svg width="{size}" height="{size}" xmlns="http://www.w3.org/2000/svg">'
-        svg += f'<rect width="100%" height="100%" fill="#FFFFFF"/>'
-        
-        # Círculo de fundo (cinza claro)
-        svg += f'<circle cx="{center}" cy="{center}" r="{radius}" fill="none" stroke="#e9ecef" stroke-width="12"/>'
-        
-        # Arco de progresso (dourado)
-        # Usar SVG path para desenhar o arco
-        large_arc = 1 if angle_percent > 0.5 else 0
-        end_x = center + radius * (3.14159 / 180) * (angle_percent * 360 - 90)
-        end_y = center + radius * (3.14159 / 180) * (angle_percent * 360 - 90)
-        
-        # Simplificado: usar um arco circular
-        svg += f'<circle cx="{center}" cy="{center}" r="{radius}" fill="none" stroke="#BF9A33" stroke-width="12" stroke-dasharray="{radius * 2 * 3.14159 * angle_percent} {radius * 2 * 3.14159}" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 {center} {center})"/>'
-        
-        # Círculo interior branco
-        svg += f'<circle cx="{center}" cy="{center}" r="{radius * 0.65}" fill="#FFFFFF"/>'
-        
-        # Score no centro
-        svg += f'<text x="{center}" y="{center - 20}" font-family="Helvetica" font-size="48" fill="#BF9A33" text-anchor="middle" font-weight="700">{int(overall_score)}</text>'
-        svg += f'<text x="{center}" y="{center + 15}" font-family="Helvetica" font-size="14" fill="#495057" text-anchor="middle">/100</text>'
-        
-        # Etiqueta
-        svg += f'<text x="{center}" y="{center + 50}" font-family="Helvetica" font-size="11" fill="#212529" text-anchor="middle" font-weight="600">SCORE GERAL</text>'
-        
-        svg += '</svg>'
-        return svg
 
-    def generate_bar_chart(self, radar_data):
-        """Gera um gráfico de barras horizontais SVG com escala 0-100.
-        Barra cinza = 100 (máximo)
-        Barra dourada = score do candidato (0-100)"""
-        
-        label_mapping = {
-            'estrutura': 'Estrutura & Clareza',
-            'conteudo': 'Conteúdo & Relevância',
-            'ats': 'Compatibilidade ATS',
-            'impacto': 'Impacto & Resultados',
-            'branding': 'Marca Pessoal',
-            'riscos': 'Riscos & Inconsistências'
-        }
-        
-        labels = [label_mapping.get(k, k.capitalize()) for k in radar_data.keys()]
-        values = [v * 5 for v in radar_data.values()]  # Converter 0-20 para 0-100
-        num_bars = len(labels)
-
-        svg_width = 700
-        svg_height = 40 + (num_bars * 50)
-        bar_height = 32
-        margin_left = 180
-        margin_right = 50
-        max_value = 100
-
-        svg = f'<svg width="{svg_width}" height="{svg_height}" xmlns="http://www.w3.org/2000/svg">'
-        svg += f'<rect width="100%" height="100%" fill="#FFFFFF"/>'
-
-        # Dimensão total da barra (sempre 100)
-        total_bar_width = svg_width - margin_left - margin_right
-
-        for i, (label, value) in enumerate(zip(labels, values)):
-            y_pos = 20 + (i * 50)
-            
-            # Barra de fundo cinza (sempre 100)
-            svg += f'<rect x="{margin_left}" y="{y_pos}" width="{total_bar_width}" height="{bar_height}" fill="#e9ecef" rx="4"/>'
-
-            # Barra dourada (score do candidato, proporcional)
-            score_bar_width = (total_bar_width / 100) * value
-            svg += f'<rect x="{margin_left}" y="{y_pos}" width="{score_bar_width}" height="{bar_height}" fill="#BF9A33" rx="4"/>'
-
-            # Rótulo da barra
-            svg += f'<text x="{margin_left - 10}" y="{y_pos + bar_height / 2 + 5}" font-family="Helvetica" font-size="12" fill="#212529" text-anchor="end" font-weight="600">{label}</text>'
-
-            # Valor numérico
-            svg += f'<text x="{margin_left + total_bar_width + 10}" y="{y_pos + bar_height / 2 + 5}" font-family="Helvetica" font-size="12" fill="#BF9A33" font-weight="700">{int(value)}/100</text>'
-
-        svg += '</svg>'
-        return svg
+def generate_cv_report(analysis_data):
+    """Função de conveniência para gerar relatório PDF."""
+    generator = ReportPDFGenerator()
+    return generator.create_pdf(analysis_data)
