@@ -148,7 +148,7 @@ class ReportPDFGenerator:
         
         h1 { font-size: 24pt; font-weight: bold; color: #1A1A1A; margin: 0 0 10pt 0; }
         h2 { font-size: 14pt; font-weight: bold; color: #1A1A1A; margin: 20pt 0 10pt 0; border-left: 3pt solid #BF9A33; padding-left: 10pt; }
-        h3 { font-size: 11pt; font-weight: bold; color: #BF9A33; margin: 15pt 0 6pt 0; }
+        h3 { font-size: 11pt; font-weight: bold; color: #BF9A33; margin: 15pt 0 6pt 0; page-break-after: avoid; page-break-inside: avoid; }
         h4 { font-size: 10pt; font-weight: bold; color: #1A1A1A; margin: 10pt 0 4pt 0; }
         
         p { margin: 0 0 8pt 0; text-align: justify; }
@@ -186,13 +186,11 @@ class ReportPDFGenerator:
         .scorecard-label { font-size: 8pt; color: #6c757d; text-transform: uppercase; margin-top: 5pt; }
         
         /* Dimension Item */
-        .dimension-item { margin-bottom: 15pt; padding-left: 10pt; border-left: 2pt solid #e9ecef; }
-        .dimension-header { margin-bottom: 5pt; }
-        .dimension-title { font-size: 11pt; font-weight: bold; color: #1A1A1A; }
-        .dimension-score { font-size: 12pt; font-weight: bold; color: #BF9A33; float: right; }
-        .dimension-bar { height: 6pt; background: #e9ecef; margin: 8pt 0; }
-        .dimension-bar-fill { height: 6pt; background: #BF9A33; }
-        .dimension-analysis { font-size: 9.5pt; color: #495057; }
+        .dimension-item { margin-bottom: 20pt; }
+        .dimension-header { background: #BF9A33; padding: 10pt 15pt; margin-bottom: 10pt; }
+        .dimension-title { font-size: 12pt; font-weight: bold; color: #FFFFFF; display: inline-block; }
+        .dimension-score { font-size: 14pt; font-weight: bold; color: #FFFFFF; float: right; }
+        .dimension-analysis { font-size: 9.5pt; color: #495057; padding: 0 5pt; }
         .dimension-focus { font-size: 9pt; color: #6c757d; margin-top: 6pt; padding: 8pt; background: #f8f9fa; border-left: 2pt solid #BF9A33; }
         
         /* Before/After */
@@ -239,6 +237,10 @@ class ReportPDFGenerator:
         
         /* No items message */
         .no-items { font-style: italic; color: #6c757d; padding: 10pt; background: #f8f9fa; text-align: center; }
+        
+        /* Analysis Content - keep with title */
+        .analysis-content { font-size: 9.5pt; color: #495057; text-align: justify; }
+        .analysis-section { page-break-inside: avoid; }
     </style>
 </head>
 <body>
@@ -343,11 +345,15 @@ class ReportPDFGenerator:
 
 <h2>Sumário Executivo Estratégico</h2>
 
+<div class="analysis-section">
 <h3>Posicionamento de Mercado</h3>
 <div class="analysis-content">{{ analysis.executive_summary.market_positioning | default('Análise não disponível.') | safe }}</div>
+</div>
 
+<div class="analysis-section">
 <h3>Fatores-Chave de Decisão</h3>
 <div class="analysis-content">{{ analysis.executive_summary.key_decision_factors | default('Análise não disponível.') | safe }}</div>
+</div>
 
 <!-- PÁGINA 4: ANÁLISE DIMENSIONAL - GRÁFICO -->
 <div class="page-break"></div>
@@ -356,7 +362,7 @@ class ReportPDFGenerator:
     <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
 </div>
 
-<h2>Análise Dimensional Detalhada</h2>
+<h2>Análise por Dimensão</h2>
 
 <!-- Gráfico de Barras -->
 <div style="text-align: center; margin: 20pt 0;">
@@ -377,12 +383,9 @@ class ReportPDFGenerator:
 <!-- Estrutura -->
 <div class="dimension-item">
     <div class="dimension-header">
-        <span class="dimension-score">{{ scores.estrutura }}/100</span>
         <span class="dimension-title">Estrutura e Clareza</span>
+        <span class="dimension-score">{{ scores.estrutura }}/100</span>
         <div class="clearfix"></div>
-    </div>
-    <div class="dimension-bar">
-        <div class="dimension-bar-fill" style="width: {{ scores.estrutura }}%;"></div>
     </div>
     <div class="dimension-analysis">{{ analysis.content_structure_analysis.organization_hierarchy | default('Análise não disponível.') | safe }}</div>
 </div>
@@ -390,12 +393,9 @@ class ReportPDFGenerator:
 <!-- Conteúdo -->
 <div class="dimension-item">
     <div class="dimension-header">
-        <span class="dimension-score">{{ scores.conteudo }}/100</span>
         <span class="dimension-title">Conteúdo e Relevância</span>
+        <span class="dimension-score">{{ scores.conteudo }}/100</span>
         <div class="clearfix"></div>
-    </div>
-    <div class="dimension-bar">
-        <div class="dimension-bar-fill" style="width: {{ scores.conteudo }}%;"></div>
     </div>
     <div class="dimension-analysis">{{ analysis.content_structure_analysis.responsibilities_results_balance | default('Análise não disponível.') | safe }}</div>
 </div>
@@ -412,12 +412,9 @@ class ReportPDFGenerator:
 <!-- Consistência -->
 <div class="dimension-item">
     <div class="dimension-header">
-        <span class="dimension-score">{{ scores.consistencia }}/100</span>
         <span class="dimension-title">Consistência e Coerência</span>
+        <span class="dimension-score">{{ scores.consistencia }}/100</span>
         <div class="clearfix"></div>
-    </div>
-    <div class="dimension-bar">
-        <div class="dimension-bar-fill" style="width: {{ scores.consistencia }}%;"></div>
     </div>
     <div class="dimension-analysis">{{ analysis.strategic_risks.identified_risks | default('Análise não disponível.') | safe }}</div>
 </div>
@@ -425,12 +422,9 @@ class ReportPDFGenerator:
 <!-- ATS -->
 <div class="dimension-item">
     <div class="dimension-header">
-        <span class="dimension-score">{{ scores.ats }}/100</span>
         <span class="dimension-title">Compatibilidade ATS</span>
+        <span class="dimension-score">{{ scores.ats }}/100</span>
         <div class="clearfix"></div>
-    </div>
-    <div class="dimension-bar">
-        <div class="dimension-bar-fill" style="width: {{ scores.ats }}%;"></div>
     </div>
     <div class="dimension-analysis">{{ analysis.ats_digital_recruitment.compatibility | default('Análise não disponível.') | safe }}</div>
 </div>
@@ -447,12 +441,9 @@ class ReportPDFGenerator:
 <!-- Impacto -->
 <div class="dimension-item">
     <div class="dimension-header">
-        <span class="dimension-score">{{ scores.impacto }}/100</span>
         <span class="dimension-title">Impacto e Resultados</span>
+        <span class="dimension-score">{{ scores.impacto }}/100</span>
         <div class="clearfix"></div>
-    </div>
-    <div class="dimension-bar">
-        <div class="dimension-bar-fill" style="width: {{ scores.impacto }}%;"></div>
     </div>
     <div class="dimension-analysis">{{ analysis.diagnostic_impact.impact_strengths | default('Análise não disponível.') | safe }}</div>
 </div>
@@ -460,12 +451,9 @@ class ReportPDFGenerator:
 <!-- Branding -->
 <div class="dimension-item">
     <div class="dimension-header">
-        <span class="dimension-score">{{ scores.branding }}/100</span>
         <span class="dimension-title">Marca Pessoal e Proposta de Valor</span>
+        <span class="dimension-score">{{ scores.branding }}/100</span>
         <div class="clearfix"></div>
-    </div>
-    <div class="dimension-bar">
-        <div class="dimension-bar-fill" style="width: {{ scores.branding }}%;"></div>
     </div>
     <div class="dimension-analysis">{{ analysis.skills_differentiation.differentiation_factors | default('Análise não disponível.') | safe }}</div>
 </div>
@@ -479,14 +467,20 @@ class ReportPDFGenerator:
 
 <h2>Diagnóstico de Impacto Profissional</h2>
 
+<div class="analysis-section">
 <h3>Leitura em 30 Segundos por um Recrutador Sénior</h3>
 <div class="analysis-content">{{ analysis.diagnostic_impact.first_30_seconds_read | default('Análise não disponível.') | safe }}</div>
+</div>
 
+<div class="analysis-section">
 <h3>Pontos Fortes de Impacto</h3>
 <div class="analysis-content">{{ analysis.diagnostic_impact.impact_strengths | default('Análise não disponível.') | safe }}</div>
+</div>
 
+<div class="analysis-section">
 <h3>Pontos de Diluição de Impacto</h3>
 <div class="analysis-content">{{ analysis.diagnostic_impact.impact_dilutions | default('Análise não disponível.') | safe }}</div>
+</div>
 
 <!-- PÁGINA 7: ANÁLISE ATS -->
 <div class="page-break"></div>
@@ -497,14 +491,20 @@ class ReportPDFGenerator:
 
 <h2>Análise ATS e Recrutamento Digital</h2>
 
+<div class="analysis-section">
 <h3>Compatibilidade com Sistemas ATS</h3>
 <div class="analysis-content">{{ analysis.ats_digital_recruitment.compatibility | default('Análise não disponível.') | safe }}</div>
+</div>
 
+<div class="analysis-section">
 <h3>Riscos de Filtragem Automática</h3>
 <div class="analysis-content">{{ analysis.ats_digital_recruitment.filtering_risks | default('Análise não disponível.') | safe }}</div>
+</div>
 
+<div class="analysis-section">
 <h3>Alinhamento com Práticas de Recrutamento</h3>
 <div class="analysis-content">{{ analysis.ats_digital_recruitment.alignment | default('Análise não disponível.') | safe }}</div>
+</div>
 
 <!-- PÁGINA 8: MELHORIAS DE FRASES -->
 <div class="page-break"></div>
@@ -537,11 +537,15 @@ class ReportPDFGenerator:
 
 <h2>Análise de Mercado e Posicionamento</h2>
 
+<div class="analysis-section">
 <h3>Contexto: {{ analysis.pdf_extended_content.sector_analysis.identified_sector | default('Setor não identificado') }}</h3>
 <div class="analysis-content">{{ analysis.pdf_extended_content.sector_analysis.sector_trends | default('Análise de tendências não disponível.') | safe }}</div>
+</div>
 
+<div class="analysis-section">
 <h3>Panorama Competitivo</h3>
 <div class="analysis-content">{{ analysis.pdf_extended_content.sector_analysis.competitive_landscape | default('Análise competitiva não disponível.') | safe }}</div>
+</div>
 
 <!-- PÁGINA 10: CERTIFICAÇÕES RECOMENDADAS -->
 <div class="page-break"></div>
@@ -595,11 +599,15 @@ class ReportPDFGenerator:
 
 <h2>Conclusão Executiva</h2>
 
+<div class="analysis-section">
 <h3>Potencial Após Melhorias</h3>
 <div class="analysis-content">{{ analysis.executive_conclusion.potential_after_improvements | default('Conclusão não disponível.') | safe }}</div>
+</div>
 
+<div class="analysis-section">
 <h3>Competitividade Esperada</h3>
 <div class="analysis-content">{{ analysis.executive_conclusion.expected_competitiveness | default('Análise não disponível.') | safe }}</div>
+</div>
 
 <!-- PÁGINA SEPARADA: OUTROS SERVIÇOS -->
 <div class="page-break"></div>
