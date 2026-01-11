@@ -483,8 +483,8 @@ def deliver_report():
                 "key_skills": []
             },
             "global_summary": {
-                "strengths": ["Análise concluída"],
-                "improvements": ["Otimização recomendada"]
+                "strengths": ["Análise baseada em estrutura concluída"],
+                "improvements": ["Otimização de conteúdo recomendada"]
             },
             "executive_summary": {
                 "global_score": 70,
@@ -511,30 +511,56 @@ def deliver_report():
                 "organization_hierarchy_signal": "Sinal de organização.",
                 "organization_hierarchy_missing": "Melhorias estruturais.",
                 "responsibilities_results_balance": "Equilíbrio de conteúdo.",
-                "responsibilities_results_balance_signal": "Sinal de equilíbrio."
+                "responsibilities_results_balance_signal": "Sinal de equilíbrio.",
+                "orientation": "Orientação para resultados."
             },
-            "ats_optimization": {
-                "keyword_analysis": "Análise de palavras-chave.",
-                "keyword_analysis_signal": "Sinal de ATS.",
-                "keyword_analysis_missing": "Palavras-chave em falta.",
-                "formatting_parsing": "Formatação para parsing.",
-                "formatting_parsing_signal": "Sinal de formatação."
+            "ats_digital_recruitment": {
+                "compatibility": "Compatibilidade básica com ATS.",
+                "filtering_risks": "Riscos de filtragem analisados.",
+                "alignment": "Alinhamento com práticas de mercado."
             },
-            "personal_branding": {
-                "professional_narrative": "Narrativa profissional.",
-                "professional_narrative_signal": "Sinal de branding.",
-                "professional_narrative_missing": "Melhorias de branding.",
-                "value_proposition": "Proposta de valor.",
-                "value_proposition_signal": "Sinal de valor."
+            "skills_differentiation": {
+                "technical_behavioral_analysis": "Análise de competências.",
+                "differentiation_factors": "Fatores de diferenciação.",
+                "common_undifferentiated": "Elementos comuns identificados."
             },
-            "strategic_roadmap": {
-                "short_term_actions": ["Revisar estrutura"],
-                "medium_term_actions": ["Enriquecer conteúdo"],
-                "long_term_actions": ["Reforçar marca"]
+            "strategic_risks": {
+                "identified_risks": "Riscos estratégicos analisados."
             },
-            "sentence_improvements": [
-                {"original": "Frase original do CV", "improved": "Melhoria sugerida"}
-            ]
+            "languages_analysis": {
+                "languages_assessment": "Avaliação de idiomas."
+            },
+            "education_analysis": {
+                "education_assessment": "Avaliação de formação académica."
+            },
+            "priority_recommendations": {
+                "immediate_adjustments": "Ajustes imediatos recomendados.",
+                "refinement_areas": "Áreas de refinamento identificadas.",
+                "deep_repositioning": "Sugestões de reposicionamento."
+            },
+            "market_analysis": {
+                "sector_trends": "Tendências do setor.",
+                "competitive_landscape": "Panorama competitivo.",
+                "opportunities_threats": "Oportunidades e ameaças."
+            },
+            "executive_conclusion": {
+                "potential_after_improvements": "Potencial de evolução identificado.",
+                "expected_competitiveness": "Competitividade esperada no mercado."
+            },
+            "final_conclusion": {
+                "executive_synthesis": "Síntese executiva final.",
+                "next_steps": "Próximos passos recomendados."
+            },
+            "pdf_extended_content": {
+                "sector_analysis": {
+                    "identified_sector": "Setor não identificado",
+                    "sector_trends": "Tendências não disponíveis.",
+                    "competitive_landscape": "Panorama não disponível."
+                },
+                "critical_certifications": []
+            },
+            "phrase_improvements": [],
+            "sentence_improvements": []
         }
         ensure_keys(report_data, required_structure)
         # -----------------------------------------
