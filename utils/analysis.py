@@ -20,11 +20,12 @@ class CVAnalyzer:
     
     def __init__(self):
         self.api_key = get_secret("GEMINI_API_KEY")
-        print(f"[DEBUG] GEMINI_API_KEY obtida: {self.api_key is not None}")
         self.model = None
         
         if self.api_key:
             try:
+                # Configurar a API key globalmente para a biblioteca google-genai
+                os.environ["GOOGLE_API_KEY"] = self.api_key
                 self.model = genai.GenerativeModel("gemini-pro")
                 print("[INFO] Modelo Gemini inicializado com sucesso.")
             except Exception as e:
@@ -500,8 +501,8 @@ Nível de Experiência: {experience_level}
                 "key_skills": []
             },
             "global_summary": {
-                "strengths": [],
-                "improvements": []
+                "strengths": ["Análise simplificada ativa", "Estrutura base identificada"],
+                "improvements": ["API Gemini temporariamente indisponível", "Tente novamente mais tarde para análise profunda"]
             },
             "executive_summary": {
                 "global_score": int(sum(radar_data.values()) / len(radar_data) * 5),
@@ -513,9 +514,45 @@ Nível de Experiência: {experience_level}
                     "impact_results": radar_data.get("impacto", 0) * 5,
                     "personal_brand": radar_data.get("branding", 0) * 5
                 },
-                "market_positioning": "Análise detalhada não disponível. Por favor, tente novamente ou contacte o suporte.",
-                "key_decision_factors": "Análise detalhada não disponível."
+                "market_positioning": "O sistema está a operar em modo de segurança (análise heurística). A análise profunda de mercado requer a API Gemini.",
+                "key_decision_factors": "Fatores de decisão baseados em métricas estruturais básicas do documento."
             },
+            "diagnostic_impact": {
+                "first_30_seconds_read": "Análise de impacto não disponível no modo de segurança.",
+                "impact_strengths": "Pontos fortes baseados em estrutura.",
+                "impact_strengths_signal": "Sinais positivos identificados.",
+                "impact_strengths_missing": "Melhorias de impacto pendentes.",
+                "impact_dilutions": "Diluições de impacto não analisadas."
+            },
+            "content_structure_analysis": {
+                "organization_hierarchy": "Hierarquia básica analisada.",
+                "organization_hierarchy_signal": "Sinal de organização.",
+                "organization_hierarchy_missing": "Melhorias estruturais.",
+                "responsibilities_results_balance": "Equilíbrio responsabilidades/resultados.",
+                "responsibilities_results_balance_signal": "Sinal de equilíbrio."
+            },
+            "ats_optimization": {
+                "keyword_analysis": "Análise de palavras-chave básica.",
+                "keyword_analysis_signal": "Sinal de ATS.",
+                "keyword_analysis_missing": "Palavras-chave em falta.",
+                "formatting_parsing": "Formatação para parsing.",
+                "formatting_parsing_signal": "Sinal de formatação."
+            },
+            "personal_branding": {
+                "professional_narrative": "Narrativa profissional básica.",
+                "professional_narrative_signal": "Sinal de branding.",
+                "professional_narrative_missing": "Melhorias de branding.",
+                "value_proposition": "Proposta de valor identificada.",
+                "value_proposition_signal": "Sinal de valor."
+            },
+            "strategic_roadmap": {
+                "short_term_actions": ["Revisar estrutura básica", "Validar dados de contacto"],
+                "medium_term_actions": ["Enriquecer conteúdo com métricas", "Otimizar para ATS"],
+                "long_term_actions": ["Reforçar marca pessoal", "Expandir rede de contactos"]
+            },
+            "sentence_improvements": [
+                {"original": "Exemplo de frase do CV", "improved": "Exemplo de melhoria sugerida"}
+            ],
             "radar_data": radar_data,
             "analysis_type": "heuristic"
         }
