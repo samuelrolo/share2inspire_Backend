@@ -349,7 +349,7 @@ class ReportPDFGenerator:
 <h3>Fatores-Chave de Decisão</h3>
 <div class="analysis-content">{{ analysis.executive_summary.key_decision_factors | default('Análise não disponível.') | safe }}</div>
 
-<!-- PÁGINA 4: ANÁLISE DIMENSIONAL -->
+<!-- PÁGINA 4: ANÁLISE DIMENSIONAL - GRÁFICO -->
 <div class="page-break"></div>
 
 <div class="page-header">
@@ -359,9 +359,20 @@ class ReportPDFGenerator:
 <h2>Análise Dimensional Detalhada</h2>
 
 <!-- Gráfico de Barras -->
-<div style="text-align: center; margin: 15pt 0;">
-    <img src="{{ bar_chart }}" width="480" alt="Análise Dimensional">
+<div style="text-align: center; margin: 20pt 0;">
+    <img src="{{ bar_chart }}" width="500" alt="Análise Dimensional">
 </div>
+
+<p class="text-muted" style="text-align: center; margin-top: 20pt;">As páginas seguintes apresentam a análise detalhada de cada dimensão avaliada.</p>
+
+<!-- PÁGINA 5: ESTRUTURA E CONTEÚDO -->
+<div class="page-break"></div>
+
+<div class="page-header">
+    <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
+</div>
+
+<h2>Análise por Dimensão</h2>
 
 <!-- Estrutura -->
 <div class="dimension-item">
@@ -374,11 +385,6 @@ class ReportPDFGenerator:
         <div class="dimension-bar-fill" style="width: {{ scores.estrutura }}%;"></div>
     </div>
     <div class="dimension-analysis">{{ analysis.content_structure_analysis.organization_hierarchy | default('Análise não disponível.') | safe }}</div>
-    {% if analysis.content_structure_analysis.organization_hierarchy_missing %}
-    <div class="dimension-focus">
-        <strong class="text-gold">Foco de Melhoria:</strong> {{ analysis.content_structure_analysis.organization_hierarchy_missing | truncate(200) }}
-    </div>
-    {% endif %}
 </div>
 
 <!-- Conteúdo -->
@@ -394,6 +400,28 @@ class ReportPDFGenerator:
     <div class="dimension-analysis">{{ analysis.content_structure_analysis.responsibilities_results_balance | default('Análise não disponível.') | safe }}</div>
 </div>
 
+<!-- PÁGINA 6: CONSISTÊNCIA E ATS -->
+<div class="page-break"></div>
+
+<div class="page-header">
+    <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
+</div>
+
+<h2>Análise por Dimensão (Continuação)</h2>
+
+<!-- Consistência -->
+<div class="dimension-item">
+    <div class="dimension-header">
+        <span class="dimension-score">{{ scores.consistencia }}/100</span>
+        <span class="dimension-title">Consistência e Coerência</span>
+        <div class="clearfix"></div>
+    </div>
+    <div class="dimension-bar">
+        <div class="dimension-bar-fill" style="width: {{ scores.consistencia }}%;"></div>
+    </div>
+    <div class="dimension-analysis">{{ analysis.strategic_risks.identified_risks | default('Análise não disponível.') | safe }}</div>
+</div>
+
 <!-- ATS -->
 <div class="dimension-item">
     <div class="dimension-header">
@@ -407,14 +435,14 @@ class ReportPDFGenerator:
     <div class="dimension-analysis">{{ analysis.ats_digital_recruitment.compatibility | default('Análise não disponível.') | safe }}</div>
 </div>
 
-<!-- PÁGINA 5: ANÁLISE DIMENSIONAL (CONT.) -->
+<!-- PÁGINA 7: IMPACTO E BRANDING -->
 <div class="page-break"></div>
 
 <div class="page-header">
     <div class="header-text">{{ candidate_name }} | {{ date_formatted }}</div>
 </div>
 
-<h2>Análise Dimensional (Continuação)</h2>
+<h2>Análise por Dimensão (Continuação)</h2>
 
 <!-- Impacto -->
 <div class="dimension-item">
@@ -440,19 +468,6 @@ class ReportPDFGenerator:
         <div class="dimension-bar-fill" style="width: {{ scores.branding }}%;"></div>
     </div>
     <div class="dimension-analysis">{{ analysis.skills_differentiation.differentiation_factors | default('Análise não disponível.') | safe }}</div>
-</div>
-
-<!-- Consistência -->
-<div class="dimension-item">
-    <div class="dimension-header">
-        <span class="dimension-score">{{ scores.consistencia }}/100</span>
-        <span class="dimension-title">Consistência e Coerência</span>
-        <div class="clearfix"></div>
-    </div>
-    <div class="dimension-bar">
-        <div class="dimension-bar-fill" style="width: {{ scores.consistencia }}%;"></div>
-    </div>
-    <div class="dimension-analysis">{{ analysis.strategic_risks.identified_risks | default('Análise não disponível.') | safe }}</div>
 </div>
 
 <!-- PÁGINA 6: DIAGNÓSTICO DE IMPACTO -->
