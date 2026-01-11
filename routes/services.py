@@ -471,12 +471,12 @@ def deliver_report():
         generator = ReportPDFGenerator()
         # Generate radar chart
         radar_scores = {
-            "Estrutura": report_data["executive_summary"]["global_score_breakdown"]["structure_clarity"],
-            "Conteúdo": report_data["executive_summary"]["global_score_breakdown"]["content_relevance"],
-            "Consistência": report_data["executive_summary"]["global_score_breakdown"]["risks_inconsistencies"],
-            "ATS": report_data["executive_summary"]["global_score_breakdown"]["ats_compatibility"],
-            "Impacto": report_data["executive_summary"]["global_score_breakdown"]["impact_results"],
-            "Marca Pessoal": report_data["executive_summary"]["global_score_breakdown"]["personal_brand"]
+            "Estrutura": report_data.get("executive_summary", {}).get("global_score_breakdown", {}).get("structure_clarity", 0),
+            "Conteúdo": report_data.get("executive_summary", {}).get("global_score_breakdown", {}).get("content_relevance", 0),
+            "Consistência": report_data.get("executive_summary", {}).get("global_score_breakdown", {}).get("risks_inconsistencies", 0),
+            "ATS": report_data.get("executive_summary", {}).get("global_score_breakdown", {}).get("ats_compatibility", 0),
+            "Impacto": report_data.get("executive_summary", {}).get("global_score_breakdown", {}).get("impact_results", 0),
+            "Marca Pessoal": report_data.get("executive_summary", {}).get("global_score_breakdown", {}).get("personal_brand", 0)
         }
         
         import tempfile

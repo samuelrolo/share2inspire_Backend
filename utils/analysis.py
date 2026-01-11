@@ -24,11 +24,10 @@ class CVAnalyzer:
         
         if self.api_key:
             try:
-                genai.configure(api_key=self.api_key)
                 self.model = genai.GenerativeModel("gemini-pro")
                 print("[INFO] Modelo Gemini inicializado com sucesso.")
             except Exception as e:
-                print(f"[ERRO] Falha ao configurar API Gemini: {e}")
+                print(f"[ERRO] Falha ao inicializar modelo Gemini: {e}")
         else:
             print("[AVISO] Chave API Gemini não encontrada.")
 
@@ -171,11 +170,19 @@ ESTRUTURA DE OUTPUT (JSON)
         ]
     }},
     
-    "executive_summary": {{
-        "global_score": <int 0-100>,
-        "market_positioning": "ANÁLISE EXAUSTIVA (300-500 palavras): Avaliação crítica e detalhada do posicionamento do candidato no mercado de trabalho português e europeu. Deve incluir: nível de senioridade percebido vs declarado, comparação rigorosa com benchmarks de mercado para a função alvo, grau de competitividade do perfil, principais diferenciais e como se alinham com expectativas de recrutadores de topo. Estruturar em 4-6 parágrafos ricos em análise contextual.",
-        "key_decision_factors": "ANÁLISE APROFUNDADA (300-500 palavras): Exploração dos principais fatores que influenciam decisões de recrutamento para este perfil específico. Analisar como experiência, competências e aspirações se traduzem em valor para potenciais empregadores, elementos decisivos na fase de triagem, e pontos que podem gerar hesitação ou interesse imediato."
-    }},
+        "executive_summary": {{
+            "global_score": <int 0-100>,
+            "global_score_breakdown": {{
+                "structure_clarity": <int 0-100>,
+                "content_relevance": <int 0-100>,
+                "risks_inconsistencies": <int 0-100>,
+                "ats_compatibility": <int 0-100>,
+                "impact_results": <int 0-100>,
+                "personal_brand": <int 0-100>
+            }},
+            "market_positioning": "ANÁLISE EXAUSTIVA (300-500 palavras): Avaliação crítica e detalhada do posicionamento do candidato no mercado de trabalho português e europeu. Deve incluir: nível de senioridade percebido vs declarado, comparação rigorosa com benchmarks de mercado para a função alvo, grau de competitividade do perfil, principais diferenciais e como se alinham com expectativas de recrutadores de topo. Estruturar em 4-6 parágrafos ricos em análise contextual.",
+            "key_decision_factors": "ANÁLISE APROFUNDADA (300-500 palavras): Exploração dos principais fatores que influenciam decisões de recrutamento para este perfil específico. Analisar como experiência, competências e aspirações se traduzem em valor para potenciais empregadores, elementos decisivos na fase de triagem, e pontos que podem gerar hesitação ou interesse imediato."
+        }},
     
     "diagnostic_impact": {{
         "first_30_seconds_read": "ANÁLISE CRÍTICA (300-500 palavras): Como um recrutador sénior interpretaria este CV nos primeiros 30 segundos. Avaliar clareza da proposta de valor, foco do perfil, coerência narrativa, capacidade de captar atenção. Identificar elementos visuais e textuais que contribuem para a primeira impressão.",
@@ -348,14 +355,7 @@ Nível de Experiência: {experience_level}
     def analyze(self, file_stream, filename, role, experience_level):
         """Método principal de análise usando Gemini File API."""
         if not self.model:
-            if self.api_key:
-                try:
-                    genai.configure(api_key=self.api_key)
-                    self.model = genai.GenerativeModel("gemini-pro")
-                except Exception as e:
-                    return {"error": f"Falha ao inicializar modelo: {e}", "analysis_type": "error"}
-            else:
-                return {"error": "Chave API Gemini não configurada.", "analysis_type": "error"}
+            return {"error": "Modelo Gemini não inicializado. Verifique a chave API.", "analysis_type": "error"}
 
         uploaded_file = None
         tmp_path = None
@@ -380,6 +380,7 @@ Nível de Experiência: {experience_level}
             
             # Processar resposta
             cleaned_text = response.text.strip()
+
             
             # Remover marcadores de código se presentes
             if cleaned_text.startswith("```json"):
@@ -392,7 +393,13 @@ Nível de Experiência: {experience_level}
             cleaned_text = cleaned_text.strip()
             
             # Parse JSON
-            analysis_data = json.loads(cleaned_text)
+            try:
+                analysis_data = json.loads(cleaned_text)
+            except json.JSONDecodeError as e:
+                print(f"[ERRO] Falha no parsing JSON: {e}")
+
+                return {"error": f"Falha no parsing JSON da resposta da API Gemini: {e}", "analysis_type": "error"}
+
             analysis_data["analysis_type"] = "gemini"
             
             # Validar e normalizar scores
