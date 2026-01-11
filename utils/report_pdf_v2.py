@@ -203,41 +203,37 @@ class ReportPDFGenerator:
     <img src="{{ main_scorecard }}" width="180" alt="Score Global">
 </div>
 
-<!-- SCORECARDS DIMENSIONAIS -->
-<table style="width: 100%; margin: 15pt 0;">
+<!-- ANÁLISE GLOBAL: PONTOS FORTES E OPORTUNIDADES -->
+<table style="width: 100%; margin: 15pt 0; border-collapse: collapse;">
     <tr>
-        <td style="width: 16.66%; text-align: center; vertical-align: top;">
-            <img src="{{ scorecard_estrutura }}" width="60" alt="Estrutura">
-            <div class="scorecard-label">Estrutura</div>
-            <div style="font-size: 7pt; color: #6c757d; margin-top: 2pt;">Organização e clareza visual</div>
+        <td style="width: 50%; vertical-align: top; padding-right: 15pt;">
+            <div style="font-size: 10pt; font-weight: bold; color: #BF9A33; margin-bottom: 8pt; border-bottom: 1pt solid #BF9A33; padding-bottom: 4pt;">Pontos Fortes</div>
+            <ul style="font-size: 9pt; color: #333333; margin: 0; padding-left: 15pt; line-height: 1.5;">
+            {% for ponto in analysis.global_summary.strengths[:4] %}
+                <li style="margin-bottom: 5pt;">{{ ponto }}</li>
+            {% else %}
+                <li style="margin-bottom: 5pt;">Trajetória profissional consistente com progressão clara</li>
+                <li style="margin-bottom: 5pt;">Experiência em organizações de referência no setor</li>
+                <li style="margin-bottom: 5pt;">Formação académica alinhada com a área de atuação</li>
+            {% endfor %}
+            </ul>
         </td>
-        <td style="width: 16.66%; text-align: center; vertical-align: top;">
-            <img src="{{ scorecard_conteudo }}" width="60" alt="Conteúdo">
-            <div class="scorecard-label">Conteúdo</div>
-            <div style="font-size: 7pt; color: #6c757d; margin-top: 2pt;">Relevância e profundidade</div>
-        </td>
-        <td style="width: 16.66%; text-align: center; vertical-align: top;">
-            <img src="{{ scorecard_consistencia }}" width="60" alt="Consistência">
-            <div class="scorecard-label">Consistência</div>
-            <div style="font-size: 7pt; color: #6c757d; margin-top: 2pt;">Coerência e ausência de lacunas</div>
-        </td>
-        <td style="width: 16.66%; text-align: center; vertical-align: top;">
-            <img src="{{ scorecard_ats }}" width="60" alt="ATS">
-            <div class="scorecard-label">ATS</div>
-            <div style="font-size: 7pt; color: #6c757d; margin-top: 2pt;">Compatibilidade com sistemas</div>
-        </td>
-        <td style="width: 16.66%; text-align: center; vertical-align: top;">
-            <img src="{{ scorecard_impacto }}" width="60" alt="Impacto">
-            <div class="scorecard-label">Impacto</div>
-            <div style="font-size: 7pt; color: #6c757d; margin-top: 2pt;">Resultados e métricas</div>
-        </td>
-        <td style="width: 16.66%; text-align: center; vertical-align: top;">
-            <img src="{{ scorecard_branding }}" width="60" alt="Branding">
-            <div class="scorecard-label">Branding</div>
-            <div style="font-size: 7pt; color: #6c757d; margin-top: 2pt;">Marca pessoal e diferenciação</div>
+        <td style="width: 50%; vertical-align: top; padding-left: 15pt;">
+            <div style="font-size: 10pt; font-weight: bold; color: #1A1A1A; margin-bottom: 8pt; border-bottom: 1pt solid #1A1A1A; padding-bottom: 4pt;">Oportunidades de Melhoria</div>
+            <ul style="font-size: 9pt; color: #333333; margin: 0; padding-left: 15pt; line-height: 1.5;">
+            {% for oportunidade in analysis.global_summary.improvements[:4] %}
+                <li style="margin-bottom: 5pt;">{{ oportunidade }}</li>
+            {% else %}
+                <li style="margin-bottom: 5pt;">Quantificar resultados com métricas de impacto</li>
+                <li style="margin-bottom: 5pt;">Reforçar keywords para otimização ATS</li>
+                <li style="margin-bottom: 5pt;">Articular proposta de valor diferenciadora</li>
+            {% endfor %}
+            </ul>
         </td>
     </tr>
 </table>
+
+
 
 <!-- PÁGINA 3: SUMÁRIO EXECUTIVO -->
 <div class="page-break"></div>

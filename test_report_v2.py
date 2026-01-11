@@ -22,6 +22,21 @@ test_analysis_data = {
         "key_skills": ["Transformação Digital", "Gestão de Mudança", "Liderança de Equipas", "Otimização de Processos", "People Analytics"]
     },
     
+    "global_summary": {
+        "strengths": [
+            "Trajetória de 11 anos com progressão consistente em RH e transformação digital",
+            "Experiência em organizações de referência como AstraZeneca e Deloitte",
+            "Especialização em área de elevada procura: digitalização de processos de RH",
+            "Formação académica sólida com Mestrado em Gestão de RH"
+        ],
+        "improvements": [
+            "Quantificar resultados com métricas de impacto e ROI das iniciativas",
+            "Reforçar keywords estratégicas para otimização ATS",
+            "Articular proposta de valor única e diferenciadora",
+            "Adicionar sumário executivo de alto impacto no início do CV"
+        ]
+    },
+    
     "executive_summary": {
         "global_score": 72,
         "market_positioning": """O perfil apresentado demonstra uma trajetória profissional sólida e bem estruturada na área de Recursos Humanos, com particular ênfase em transformação digital e excelência de processos. A experiência acumulada ao longo de 11 anos, combinada com passagens por organizações de referência como AstraZeneca, posiciona o candidato num patamar competitivo para funções de direção em empresas de média e grande dimensão no mercado português e europeu.

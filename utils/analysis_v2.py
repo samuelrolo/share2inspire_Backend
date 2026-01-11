@@ -154,6 +154,21 @@ ESTRUTURA DE OUTPUT (JSON)
         "key_skills": ["Top 5-8 competências técnicas ou comportamentais mais relevantes"]
     }},
     
+    "global_summary": {{
+        "strengths": [
+            "Ponto forte 1: frase concisa e específica sobre um aspeto positivo do CV (máx 15 palavras)",
+            "Ponto forte 2: frase concisa e específica sobre um aspeto positivo do CV (máx 15 palavras)",
+            "Ponto forte 3: frase concisa e específica sobre um aspeto positivo do CV (máx 15 palavras)",
+            "Ponto forte 4: frase concisa e específica sobre um aspeto positivo do CV (máx 15 palavras)"
+        ],
+        "improvements": [
+            "Oportunidade 1: frase concisa e específica sobre uma área de melhoria (máx 15 palavras)",
+            "Oportunidade 2: frase concisa e específica sobre uma área de melhoria (máx 15 palavras)",
+            "Oportunidade 3: frase concisa e específica sobre uma área de melhoria (máx 15 palavras)",
+            "Oportunidade 4: frase concisa e específica sobre uma área de melhoria (máx 15 palavras)"
+        ]
+    }},
+    
     "executive_summary": {{
         "global_score": <int 0-100>,
         "market_positioning": "ANÁLISE EXAUSTIVA (300-500 palavras): Avaliação crítica e detalhada do posicionamento do candidato no mercado de trabalho português e europeu. Deve incluir: nível de senioridade percebido vs declarado, comparação rigorosa com benchmarks de mercado para a função alvo, grau de competitividade do perfil, principais diferenciais e como se alinham com expectativas de recrutadores de topo. Estruturar em 4-6 parágrafos ricos em análise contextual.",
