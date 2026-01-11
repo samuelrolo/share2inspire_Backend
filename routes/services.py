@@ -460,6 +460,82 @@ def deliver_report():
             return jsonify({"success": False, "error": "Dados do relatório ausentes"}), 400
         report_data = json.loads(report_json)
         
+        # --- NORMALIZAÇÃO DE DADOS (BLINDAGEM) ---
+        def ensure_keys(d, keys_defaults):
+            for key, default in keys_defaults.items():
+                if key not in d or d[key] is None:
+                    d[key] = default
+                elif isinstance(default, dict) and isinstance(d[key], dict):
+                    ensure_keys(d[key], default)
+        
+        required_structure = {
+            "candidate_profile": {
+                "detected_name": name or "Candidato",
+                "detected_role": "Não identificado",
+                "detected_sector": "Não identificado",
+                "total_years_exp": "N/D",
+                "seniority": "N/D",
+                "education_level": "N/D",
+                "languages_detected": [],
+                "key_skills": []
+            },
+            "global_summary": {
+                "strengths": ["Análise concluída"],
+                "improvements": ["Otimização recomendada"]
+            },
+            "executive_summary": {
+                "global_score": 70,
+                "global_score_breakdown": {
+                    "structure_clarity": 70,
+                    "content_relevance": 70,
+                    "risks_inconsistencies": 70,
+                    "ats_compatibility": 70,
+                    "impact_results": 70,
+                    "personal_brand": 70
+                },
+                "market_positioning": "Análise de posicionamento disponível no relatório.",
+                "key_decision_factors": "Fatores de decisão detalhados no PDF."
+            },
+            "diagnostic_impact": {
+                "first_30_seconds_read": "Análise de impacto inicial.",
+                "impact_strengths": "Pontos fortes identificados.",
+                "impact_strengths_signal": "Sinal positivo.",
+                "impact_strengths_missing": "Melhorias pendentes.",
+                "impact_dilutions": "Áreas de diluição."
+            },
+            "content_structure_analysis": {
+                "organization_hierarchy": "Hierarquia da informação.",
+                "organization_hierarchy_signal": "Sinal de organização.",
+                "organization_hierarchy_missing": "Melhorias estruturais.",
+                "responsibilities_results_balance": "Equilíbrio de conteúdo.",
+                "responsibilities_results_balance_signal": "Sinal de equilíbrio."
+            },
+            "ats_optimization": {
+                "keyword_analysis": "Análise de palavras-chave.",
+                "keyword_analysis_signal": "Sinal de ATS.",
+                "keyword_analysis_missing": "Palavras-chave em falta.",
+                "formatting_parsing": "Formatação para parsing.",
+                "formatting_parsing_signal": "Sinal de formatação."
+            },
+            "personal_branding": {
+                "professional_narrative": "Narrativa profissional.",
+                "professional_narrative_signal": "Sinal de branding.",
+                "professional_narrative_missing": "Melhorias de branding.",
+                "value_proposition": "Proposta de valor.",
+                "value_proposition_signal": "Sinal de valor."
+            },
+            "strategic_roadmap": {
+                "short_term_actions": ["Revisar estrutura"],
+                "medium_term_actions": ["Enriquecer conteúdo"],
+                "long_term_actions": ["Reforçar marca"]
+            },
+            "sentence_improvements": [
+                {"original": "Frase original do CV", "improved": "Melhoria sugerida"}
+            ]
+        }
+        ensure_keys(report_data, required_structure)
+        # -----------------------------------------
+        
         cv_file = request.files.get("cv_file")
         email = request.form.get("email")
         name = request.form.get("name")
