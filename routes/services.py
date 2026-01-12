@@ -411,7 +411,7 @@ def request_report_payment():
            return jsonify({"success": False, "error": f"Erro MB WAY: {payment_result.get('error')}"}), 400
 
         # >>> 3. Enviar EMAIL 2: Pagamento MB Way <<<
-        payment_link = payment_result.get('payment_url', f"https://share2inspire.pt/pages/pagamento.html?orderId={payment_data['orderId']}")
+        payment_link = payment_result.get("payment_url", f"https://share2inspire.pt/pages/pagamento.html?orderId={payment_data.get('orderId')}")
         
         subject_2, body_2 = get_email_pagamento_mbway(
             nome=name,
