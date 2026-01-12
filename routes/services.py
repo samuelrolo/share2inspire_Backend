@@ -645,9 +645,14 @@ def deliver_report():
         
         try:
             print(f"[DEBUG] Tentando enviar email para {email} via Brevo...")
+            print(f"[DEBUG] Tamanho do PDF: {len(pdf_bytes)} bytes")
+            print(f"[DEBUG] Tamanho do CV: {len(cv_content)} bytes")
+            print(f"[DEBUG] Total de anexos: {len(attachments)}")
             api_instance = get_brevo_api()
+            print(f"[DEBUG] API instance criada com sucesso")
             api_response = api_instance.send_transac_email(send_smtp_email)
             print(f"[DEBUG] Resposta da Brevo: {api_response}")
+            print(f"[DEBUG] Email enviado com sucesso!")
             return jsonify({"success": True, "message": "Relatório enviado com sucesso!"}), 200
         except ApiException as e:
             print(f"[ERRO] Falha na API da Brevo: {e}")
