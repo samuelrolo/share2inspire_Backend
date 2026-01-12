@@ -16,14 +16,12 @@ class CVAnalyzer:
         self.model = None
         
         if self.api_key:
-            try:
-                genai.configure(api_key=self.api_key)
-                self.model = genai.GenerativeModel("gemini-pro")
-                print("[INFO] Modelo Gemini inicializado com sucesso.")
-            except Exception as e:
-                print(f"[ERRO] Falha ao inicializar modelo Gemini: {e}")
+            print(f"[INFO] Tentando inicializar Gemini com API Key (primeiros 5 chars): {self.api_key[:5]}...{self.api_key[-5:]}")
+            genai.configure(api_key=self.api_key)
+            self.model = genai.GenerativeModel("gemini-pro")
+            print("[INFO] Modelo Gemini inicializado com sucesso.")
         else:
-            print("[AVISO] Chave API Gemini não encontrada.")
+            print("[AVISO] Chave API Gemini não encontrada. O modelo Gemini não será inicializado.")
 
         self.section_patterns = {
             "experience": ["experiência", "experience", "profissional", "work history", "employment", "carreira"],
@@ -132,8 +130,17 @@ class CVAnalyzer:
                 "key_skills": []
             },
             "global_summary": {
-                "strengths": ["Análise de segurança ativa", "Estrutura base do relatório garantida"],
-                "improvements": ["API de análise avançada indisponível", "Conteúdo gerado com base em regras heurísticas"]
+                "strengths": [
+                    "**Estrutura Base Consistente**: O CV apresenta uma organização fundamental que permite a leitura e extração de informações básicas.",
+                    "**Clareza na Identificação**: As secções principais (experiência, educação, competências) são identificáveis, facilitando a navegação inicial.",
+                    "**Potencial de Otimização**: Existe uma base sólida para aprimoramento, especialmente na personalização e impacto dos resultados."
+                ],
+                "improvements": [
+                    "**Análise Avançada Indisponível**: A ausência da análise Gemini impede insights aprofundados sobre o posicionamento de mercado, riscos estratégicos e diferenciação de competências.",
+                    "**Conteúdo Genérico**: As recomendações são baseadas em heurísticas gerais e não refletem uma análise personalizada do seu perfil e do seu CV.",
+                    "**Otimização para ATS**: Não foi possível avaliar a compatibilidade do CV com sistemas de Applicant Tracking System (ATS), um fator crítico na triagem inicial.",
+                    "**Impacto e Resultados**: A quantificação de resultados e o impacto das suas experiências não foram analisados em detalhe, o que pode diluir a força da sua candidatura."
+                ]
             },
             "executive_summary": {
                 "global_score": int(sum(radar_data.values()) / len(radar_data) * 5),
@@ -149,40 +156,40 @@ class CVAnalyzer:
                 "key_decision_factors": "### Fatores-Chave de Decisão (Modo de Segurança)\n\n- **Primeira Impressão**: A estrutura do seu CV é o primeiro fator de decisão. Garanta que a leitura inicial seja fluida e que a sua proposta de valor seja clara nos primeiros 20 segundos.\n- **Resultados Quantificáveis**: A inclusão de métricas e resultados concretos é um fator decisivo para recrutadores. A análise completa irá avaliar a força dos seus KPIs.\n- **Alinhamento com a Vaga**: A personalização do CV para cada candidatura, destacando as competências mais relevantes, é um fator crítico de sucesso que a análise completa ajuda a otimizar."
             },
             "diagnostic_impact": {
-                "first_30_seconds_read": "### Leitura em 30 Segundos (Modo de Segurança)\n\n- **Clareza**: A análise heurística sugere que a estrutura do CV permite uma leitura inicial, mas a clareza da proposta de valor pode não ser imediatamente óbvia.\n- **Foco**: É crucial que o seu objetivo profissional e a sua principal área de especialização sejam identificáveis à primeira vista.\n- **Ação Recomendada**: Reveja o seu resumo e os títulos das secções para garantir que comunicam o seu valor de forma rápida e eficaz.",
-                "impact_strengths": "### Pontos de Impacto (Modo de Segurança)\n\n- **Potencial de Impacto**: A análise completa identifica os pontos do seu CV que geram maior impacto, como resultados quantificados e progressão de carreira.\n- **Oportunidade**: No modo de segurança, recomendamos que verifique se cada ponto da sua experiência profissional responde à pergunta: \'Qual foi o resultado do meu trabalho?\'",
-                "impact_strengths_signal": "Análise de sinais de impacto indisponível.",
-                "impact_strengths_missing": "Análise de pontos em falta indisponível.",
-                "impact_dilutions": "### Pontos de Diluição (Modo de Segurança)\n\n- **Generalidade**: A análise heurística não consegue avaliar a especificidade da linguagem, mas é comum que a falta de detalhes concretos dilua o impacto do CV.\n- **Falta de Foco**: Um CV que tenta abranger demasiadas áreas pode confundir o recrutador. A análise completa ajudaria a focar a sua narrativa."
+                "first_30_seconds_read": "### Leitura em 30 Segundos (Modo de Segurança)\n\n- **Primeira Impressão**: A capacidade de captar a atenção do recrutador nos primeiros 30 segundos é crucial. A estrutura atual do CV permite uma leitura inicial, mas a otimização do resumo e dos destaques pode aumentar significativamente o impacto.\n- **Clareza e Foco**: Garanta que a sua proposta de valor e os seus objetivos de carreira são imediatamente claros. Evite jargões excessivos e seja direto ao ponto.\n- **Chamada à Ação**: O CV deve guiar o leitor para as informações mais relevantes, incentivando uma leitura mais aprofundada. Considere usar um resumo profissional conciso e impactante.",
+                "impact_strengths": "### Pontos de Impacto (Modo de Segurança)\n\n- **Resultados Quantificáveis**: O impacto de um CV é maximizado pela apresentação de resultados concretos e quantificáveis. A análise heurística sugere que a inclusão de métricas pode fortalecer significativamente a sua narrativa.\n- **Progressão de Carreira**: Destaque a sua evolução profissional e as responsabilidades crescentes. A clareza na sua trajetória demonstra ambição e capacidade de crescimento.\n- **Competências Relevantes**: Sublinhe as competências mais relevantes para a função desejada, mostrando como elas foram aplicadas para gerar valor.",
+                "impact_strengths_signal": "Análise de sinais de impacto indisponível no modo de segurança. A análise completa forneceria insights sobre a força dos seus resultados e a sua capacidade de gerar valor.",
+                "impact_strengths_missing": "Análise de pontos em falta indisponível no modo de segurança. A análise completa identificaria lacunas na apresentação do seu impacto e resultados.",
+                "impact_dilutions": "### Pontos de Diluição (Modo de Segurança)\n\n- **Generalidade**: Descrições de funções genéricas ou a ausência de resultados específicos podem diluir o impacto do seu CV. Seja o mais específico possível sobre as suas contribuições.\n- **Falta de Foco**: Um CV que tenta ser "tudo para todos" pode perder o seu foco. Concentre-se nas experiências e competências mais relevantes para o seu objetivo de carreira.\n- **Erros e Inconsistências**: Pequenos erros gramaticais ou inconsistências de formatação podem desviar a atenção do recrutador e diminuir a credibilidade do seu perfil."
             },
             "content_structure_analysis": {
-                "organization_hierarchy": "### Organização e Estrutura (Modo de Segurança)\n\n- **Estrutura Base**: O sistema identificou a presença de secções chave, o que é um bom ponto de partida.\n- **Otimização**: A análise completa avalia a ordem das secções, o uso de espaço em branco e a hierarquia visual para garantir uma leitura ótima.",
-                "organization_hierarchy_signal": "Análise de sinais de organização indisponível.",
-                "organization_hierarchy_missing": "Análise de pontos em falta indisponível.",
-                "content_completeness": "### Completude do Conteúdo (Modo de Segurança)\n\n- **Secções Essenciais**: A análise heurística verifica a presença de secções como Experiência e Educação.\n- **Profundidade**: A análise completa avalia se cada secção tem a profundidade e o detalhe adequados para a sua senioridade.",
-                "content_completeness_signal": "Análise de sinais de completude indisponível.",
-                "content_completeness_missing": "Análise de pontos em falta indisponível."
+                "organization_hierarchy": "### Organização e Estrutura (Modo de Segurança)\n\n- **Estrutura Base**: O CV apresenta uma estrutura fundamental com secções identificáveis, o que facilita a leitura inicial. No entanto, a otimização da hierarquia visual e do fluxo de informação pode ser aprimorada.\n- **Fluxo de Leitura**: Garanta que a organização do conteúdo guia o recrutador de forma lógica através da sua trajetória profissional e académica.\n- **Espaço em Branco**: O uso adequado de espaço em branco melhora a legibilidade e a estética do documento. Evite blocos de texto densos.",
+                "organization_hierarchy_signal": "Análise de sinais de organização indisponível no modo de segurança. A análise completa avaliaria a eficácia da sua estrutura para captar e manter a atenção do recrutador.",
+                "organization_hierarchy_missing": "Análise de pontos em falta indisponível no modo de segurança. A análise completa identificaria oportunidades para otimizar a organização e o fluxo do seu CV.",
+                "content_completeness": "### Completude do Conteúdo (Modo de Segurança)\n\n- **Secções Essenciais**: O CV inclui as secções básicas como Experiência e Educação. Para um perfil completo, considere adicionar secções como Projetos, Publicações ou Voluntariado, se aplicável.\n- **Detalhe e Profundidade**: A profundidade do detalhe em cada secção é crucial. Certifique-se de que cada experiência e formação são descritas com informações relevantes e impactantes.\n- **Consistência**: Mantenha a consistência na formatação e no nível de detalhe em todas as secções para uma apresentação profissional.",
+                "content_completeness_signal": "Análise de sinais de completude indisponível no modo de segurança. A análise completa avaliaria se o seu CV fornece todas as informações necessárias para uma avaliação abrangente.",
+                "content_completeness_missing": "Análise de pontos em falta indisponível no modo de segurança. A análise completa identificaria lacunas no conteúdo do seu CV que poderiam ser preenchidas para fortalecer a sua candidatura."
             },
             "ats_digital_recruitment": {
-                "keyword_optimization": "### Otimização para ATS (Modo de Segurança)\n\n- **Palavras-Chave**: A análise heurística não avalia a otimização de palavras-chave, um fator crítico para passar nos sistemas de triagem automática (ATS).\n- **Ação Recomendada**: Garanta que o seu CV inclui os termos e tecnologias mais comuns na sua área e nas descrições de vagas para as quais se candidata.",
-                "keyword_optimization_signal": "Análise de sinais de otimização indisponível.",
-                "keyword_optimization_missing": "Análise de pontos em falta indisponível.",
-                "format_parsing": "### Formatação e Parsing (Modo de Segurança)\n\n- **Compatibilidade**: Utilize um formato de ficheiro e uma estrutura simples (evite tabelas, colunas e imagens) para garantir que os ATS conseguem ler o seu CV corretamente.\n- **Validação**: A análise completa simula a leitura por um ATS para identificar potenciais problemas de parsing.",
-                "format_parsing_signal": "Análise de sinais de formatação indisponível.",
-                "format_parsing_missing": "Análise de pontos em falta indisponível."
+                "keyword_optimization": "### Otimização para ATS (Modo de Segurança)\n\n- **Palavras-Chave**: A otimização para sistemas de Applicant Tracking System (ATS) é crucial. A análise heurística não pode avaliar a densidade e relevância das palavras-chave, mas é fundamental que o seu CV inclua termos específicos da sua área e da vaga desejada.\n- **Ação Recomendada**: Revise as descrições de vagas para as quais se candidata e incorpore as palavras-chave mais relevantes de forma natural no seu CV.\n- **Evitar Jargões**: Embora palavras-chave sejam importantes, evite jargões excessivos que possam confundir o recrutador humano.",
+                "keyword_optimization_signal": "Análise de sinais de otimização indisponível no modo de segurança. A análise completa forneceria um score de compatibilidade com ATS e sugestões de palavras-chave.",
+                "keyword_optimization_missing": "Análise de pontos em falta indisponível no modo de segurança. A análise completa identificaria lacunas na otimização de palavras-chave e na estrutura para ATS.",
+                "format_parsing": "### Formatação e Parsing (Modo de Segurança)\n\n- **Compatibilidade de Formato**: Para garantir que o seu CV é lido corretamente pelos ATS, utilize formatos simples e amplamente aceites (ex: PDF sem elementos complexos como tabelas ou caixas de texto). A análise heurística não pode validar a integridade do parsing.\n- **Estrutura Limpa**: Evite designs excessivamente gráficos ou com múltiplas colunas, pois podem confundir os ATS e resultar na perda de informações cruciais.\n- **Validação Visual**: Após a criação do CV, visualize-o como um texto simples para ter uma ideia de como um ATS o "lê".",
+                "format_parsing_signal": "Análise de sinais de formatação indisponível no modo de segurança. A análise completa simularia o parsing por um ATS e identificaria potenciais erros.",
+                "format_parsing_missing": "Análise de pontos em falta indisponível no modo de segurança. A análise completa identificaria problemas de formatação que dificultam a leitura por ATS."
             },
             "strategic_risks": {
-                "career_gaps": "### Lacunas de Carreira (Modo de Segurança)\n\n- **Contexto é Chave**: A análise heurística não consegue interpretar lacunas de carreira. Se existirem, é fundamental contextualizá-las (ex: formação, projetos pessoais, etc.).",
-                "career_gaps_signal": "Análise de sinais de lacunas indisponível.",
-                "career_gaps_missing": "Análise de pontos em falta indisponível.",
-                "frequent_changes": "### Mudanças Frequentes (Modo de Segurança)\n\n- **Narrativa**: Mudanças frequentes de emprego podem ser um sinal de alerta se não forem justificadas por uma narrativa de crescimento e progressão.",
-                "frequent_changes_signal": "Análise de sinais de mudanças indisponível.",
-                "frequent_changes_missing": "Análise de pontos em falta indisponível."
+                "career_gaps": "### Lacunas de Carreira (Modo de Segurança)\n\n- **Contexto é Chave**: A análise heurística não consegue interpretar lacunas de carreira. Se existirem, é fundamental contextualizá-las (ex: formação, projetos pessoais, etc.) no seu CV, explicando os motivos e as atividades desenvolvidas durante esses períodos.\n- **Impacto na Percepção**: Lacunas não explicadas podem levantar questões para os recrutadores. Uma narrativa clara e positiva pode transformar uma potencial fraqueza numa demonstração de resiliência ou desenvolvimento pessoal.\n- **Ação Recomendada**: Se tiver lacunas, adicione uma breve explicação no seu CV ou carta de apresentação, focando-se em como esse tempo contribuiu para o seu crescimento.",
+                "career_gaps_signal": "Análise de sinais de lacunas indisponível no modo de segurança. A análise completa forneceria insights sobre como as lacunas podem ser percebidas e como mitigá-las.",
+                "career_gaps_missing": "Análise de pontos em falta indisponível no modo de segurança. A análise completa identificaria a presença de lacunas e sugeriria estratégias para as abordar.",
+                "frequent_changes": "### Mudanças Frequentes (Modo de Segurança)\n\n- **Narrativa de Progressão**: Mudanças frequentes de emprego podem ser um sinal de alerta se não forem justificadas por uma narrativa de crescimento, progressão de carreira ou busca por novas oportunidades alinhadas com os seus objetivos.\n- **Coerência**: Garanta que cada mudança de emprego se encaixa numa história coerente de desenvolvimento profissional. Se houver mudanças que pareçam aleatórias, considere como pode contextualizá-las.\n- **Ação Recomendada**: Se o seu histórico de emprego mostrar mudanças frequentes, prepare uma explicação concisa e positiva que demonstre como cada experiência contribuiu para o seu desenvolvimento e objetivos de carreira.",
+                "frequent_changes_signal": "Análise de sinais de mudanças indisponível no modo de segurança. A análise completa avaliaria o impacto das mudanças frequentes na percepção do seu perfil.",
+                "frequent_changes_missing": "Análise de pontos em falta indisponível no modo de segurança. A análise completa identificaria padrões de mudanças e sugeriria estratégias para otimizar a sua apresentação."
             },
             "evolution_roadmap": {
-                "quick_wins": "- **Resumo Profissional**: Reveja o seu resumo para garantir que é uma proposta de valor clara e impactante.\n- **Métricas**: Adicione pelo menos uma métrica ou resultado quantificável a cada uma das três experiências mais recentes.",
-                "medium_term": "- **Personalização**: Adapte o seu CV para cada candidatura, destacando as competências e experiências mais relevantes para a vaga específica.",
-                "long_term": "- **Branding Pessoal**: Desenvolva uma narrativa consistente em todas as suas plataformas profissionais (LinkedIn, etc.) que reforce a sua marca pessoal."
+                "quick_wins": "- **Resumo Profissional**: Otimize o seu resumo para ser conciso e impactante, destacando a sua proposta de valor única e os seus principais diferenciais.\n- **Métricas e Resultados**: Adicione métricas e resultados quantificáveis a cada experiência relevante, demonstrando o impacto real do seu trabalho.\n- **Palavras-Chave**: Integre palavras-chave relevantes da sua área e das descrições de vagas para melhorar a compatibilidade com sistemas ATS.",
+                "medium_term": "- **Personalização do CV**: Adapte o seu CV para cada candidatura, alinhando as suas competências e experiências com os requisitos específicos da vaga.\n- **Desenvolvimento de Competências**: Identifique e desenvolva competências em alta demanda no seu setor para aumentar a sua empregabilidade.\n- **Networking Estratégico**: Conecte-se com profissionais da sua área e participe em eventos para expandir a sua rede de contactos e oportunidades.",
+                "long_term": "- **Branding Pessoal Online**: Construa uma presença online sólida e consistente (LinkedIn, portfólio, etc.) que reforce a sua marca pessoal e expertise.\n- **Liderança e Mentoria**: Procure oportunidades de liderança ou mentoria para demonstrar as suas capacidades de gestão e influência.\n- **Aprendizagem Contínua**: Mantenha-se atualizado com as últimas tendências e tecnologias do seu setor através de cursos, certificações e autoestudo."
             },
             "radar_data": radar_data,
             "analysis_type": "heuristic"

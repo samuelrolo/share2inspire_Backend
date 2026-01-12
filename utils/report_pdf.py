@@ -752,8 +752,8 @@ class ReportPDFGenerator:
             'branding': 'Marca Pessoal'
         }
         
-        labels = [label_mapping.get(k, k.capitalize()) for k in ordered_keys if k in radar_data]
-        values = [min(radar_data.get(k, 0) * 5, 100) for k in ordered_keys if k in radar_data]
+        labels = [label_mapping.get(k, k.capitalize()) for k in ordered_keys]
+        values = [min(radar_data.get(k, 0) * 5, 100) for k in ordered_keys]
         num_bars = len(labels)
 
         # Tamanho grande para ocupar a página
