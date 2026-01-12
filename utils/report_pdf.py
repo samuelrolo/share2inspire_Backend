@@ -146,10 +146,10 @@ class ReportPDFGenerator:
             font-size: 10pt;
         }
         
-        h1 { font-size: 24pt; font-weight: bold; color: #1A1A1A; margin: 0 0 10pt 0; }
-        h2 { font-size: 14pt; font-weight: bold; color: #1A1A1A; margin: 20pt 0 10pt 0; border-left: 3pt solid #BF9A33; padding-left: 10pt; }
-        h3 { font-size: 11pt; font-weight: bold; color: #BF9A33; margin: 15pt 0 6pt 0; page-break-after: avoid; }
-        h4 { font-size: 10pt; font-weight: bold; color: #1A1A1A; margin: 10pt 0 4pt 0; }
+        h1 { font-size: 24pt; font-weight: bold; color: #1A1A1A; margin: 0 0 10pt 0; page-break-after: avoid; }
+        h2 { font-size: 14pt; font-weight: bold; color: #1A1A1A; margin: 20pt 0 10pt 0; border-left: 3pt solid #BF9A33; padding-left: 10pt; page-break-after: avoid; page-break-inside: avoid; }
+        h3 { font-size: 11pt; font-weight: bold; color: #BF9A33; margin: 15pt 0 6pt 0; page-break-after: avoid; page-break-inside: avoid; }
+        h4 { font-size: 10pt; font-weight: bold; color: #1A1A1A; margin: 10pt 0 4pt 0; page-break-after: avoid; page-break-inside: avoid; }
         
         p { margin: 0 0 8pt 0; text-align: justify; }
         
@@ -249,8 +249,19 @@ class ReportPDFGenerator:
         .no-items { font-style: italic; color: #6c757d; padding: 10pt; background: #f8f9fa; text-align: center; }
         
         /* Analysis Content - keep with title */
-        .analysis-content { font-size: 9.5pt; color: #495057; text-align: justify; }
-        .analysis-section { page-break-inside: avoid; }
+        .analysis-content { font-size: 9.5pt; color: #495057; text-align: justify; page-break-before: avoid; }
+        .analysis-section { page-break-inside: avoid; margin-bottom: 15pt; }
+        .analysis-section h3 + .analysis-content { page-break-before: avoid; }
+        
+        /* Dimension items - keep together */
+        .dimension-item { page-break-inside: avoid; margin-bottom: 20pt; }
+        .dimension-header + .dimension-analysis { page-break-before: avoid; }
+        
+        /* Recommendation items - keep together */
+        .recommendation-item { page-break-inside: avoid; }
+        
+        /* Certification items - keep together */
+        .cert-item { page-break-inside: avoid; }
     </style>
 </head>
 <body>
