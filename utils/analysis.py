@@ -4,7 +4,7 @@ import os
 import io
 import tempfile
 from PyPDF2 import PdfReader
-import google.genai as genai
+import google.generativeai as genai
 from utils.secrets import get_secret
 
 
@@ -13,13 +13,20 @@ class CVAnalyzer:
     
     def __init__(self):
         self.api_key = get_secret("GEMINI_API_KEY")
+        if not self.api_key:
+            self.api_key = os.environ.get("GEMINI_API_KEY")
+        
         self.model = None
         
         if self.api_key:
-            print(f"[INFO] Tentando inicializar Gemini com API Key (primeiros 5 chars): {self.api_key[:5]}...{self.api_key[-5:]}")
-            genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel("gemini-pro")
-            print("[INFO] Modelo Gemini inicializado com sucesso.")
+            try:
+                print(f"[INFO] Tentando inicializar Gemini com API Key (primeiros 5 chars): {self.api_key[:5]}...{self.api_key[-5:]}")
+                genai.configure(api_key=self.api_key)
+                self.model = genai.GenerativeModel("gemini-1.5-flash")
+                print("[INFO] Modelo Gemini inicializado com sucesso.")
+            except Exception as e:
+                print(f"[ERRO] Falha ao inicializar Gemini: {e}")
+                self.model = None
         else:
             print("[AVISO] Chave API Gemini não encontrada. O modelo Gemini não será inicializado.")
 
