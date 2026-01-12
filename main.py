@@ -91,5 +91,26 @@ def api_health():
     })
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    from gunicorn.app.base import BaseApplication
+
+    class StandaloneApplication(BaseApplication):
+        def __init__(self, app, options=None):
+            self.application = app
+            self.options = options or {}
+            super().__init__()
+
+        def load_config(self):
+            config = {key: value for key, value in self.options.items() if key in self.cfg.settings and value is not None}
+            for key, value in config.items():
+                self.cfg.set(key.lower(), value)
+
+        def load(self):
+            return self.application
+
+    options = {
+        'bind': '%s:%s' % ('0.0.0.0', os.environ.get('PORT', '8080')),
+        'workers': 1, # Pode ser ajustado, mas 1 é bom para depuração
+        'timeout': 120, # Aumentar o timeout para 120 segundos
+        'worker_class': 'sync', # Usar worker síncrono
+    }
+    StandaloneApplication(app, options).run()

@@ -56,7 +56,86 @@ class CVAnalyzer:
 
     def _build_analysis_prompt(self, role, experience_level):
         """Constrói o prompt de análise aprofundada."""
-        return f"""...""" # Prompt omitido para brevidade
+        return f"""Você é um analista de RH especializado em recrutamento e análise de CVs. A sua tarefa é analisar o CV fornecido e gerar um relatório detalhado em formato JSON, seguindo a estrutura especificada. O candidato está a candidatar-se para a função de '{role}' com um nível de experiência '{experience_level}'.
+
+O relatório JSON deve conter as seguintes secções e campos:
+
+{{
+    "candidate_profile": {{
+        "detected_name": "Nome do Candidato",
+        "detected_role": "Função detetada no CV",
+        "detected_sector": "Setor detetado no CV",
+        "total_years_exp": "Total de anos de experiência (ex: 5 anos)",
+        "seniority": "Nível de senioridade (ex: Júnior, Pleno, Sênior)",
+        "education_level": "Nível de educação mais alto (ex: Mestrado, Licenciatura)",
+        "languages_detected": ["Lista de idiomas (ex: Português, Inglês)"],
+        "key_skills": ["Lista de competências chave (ex: Python, Gestão de Projetos)"]
+    }},
+    "global_summary": {{
+        "strengths": ["Lista de pontos fortes gerais do CV"],
+        "improvements": ["Lista de pontos a melhorar gerais do CV"]
+    }},
+    "executive_summary": {{
+        "global_score": "Score global do CV (0-100)",
+        "global_score_breakdown": {{
+            "structure_clarity": "Score de clareza da estrutura (0-100)",
+            "content_relevance": "Score de relevância do conteúdo (0-100)",
+            "risks_inconsistencies": "Score de riscos e inconsistências (0-100)",
+            "ats_compatibility": "Score de compatibilidade com ATS (0-100)",
+            "impact_results": "Score de impacto e resultados (0-100)",
+            "personal_brand": "Score de marca pessoal (0-100)"
+        }},
+        "market_positioning": "Análise do posicionamento do candidato no mercado de trabalho",
+        "key_decision_factors": "Fatores chave que influenciam a decisão de contratação"
+    }},
+    "diagnostic_impact": {{
+        "first_30_seconds_read": "Análise do impacto do CV nos primeiros 30 segundos de leitura",
+        "impact_strengths": "Pontos fortes que geram impacto no CV",
+        "impact_strengths_signal": "Sinais de impacto identificados",
+        "impact_strengths_missing": "Pontos de impacto em falta",
+        "impact_dilutions": "Pontos que diluem o impacto do CV"
+    }},
+    "content_structure_analysis": {{
+        "organization_hierarchy": "Análise da organização e hierarquia do conteúdo",
+        "organization_hierarchy_signal": "Sinais de boa organização",
+        "organization_hierarchy_missing": "Pontos de organização em falta",
+        "content_completeness": "Análise da completude do conteúdo",
+        "content_completeness_signal": "Sinais de conteúdo completo",
+        "content_completeness_missing": "Pontos de conteúdo em falta"
+    }},
+    "ats_digital_recruitment": {{
+        "keyword_optimization": "Análise da otimização de palavras-chave para ATS",
+        "keyword_optimization_signal": "Sinais de boa otimização de palavras-chave",
+        "keyword_optimization_missing": "Pontos de otimização de palavras-chave em falta",
+        "format_parsing": "Análise da formatação e parsing para ATS",
+        "format_parsing_signal": "Sinais de boa formatação para ATS",
+        "format_parsing_missing": "Pontos de formatação em falta para ATS"
+    }},
+    "strategic_risks": {{
+        "career_gaps": "Análise de lacunas de carreira e como são abordadas",
+        "career_gaps_signal": "Sinais de lacunas de carreira",
+        "career_gaps_missing": "Pontos de lacunas de carreira em falta",
+        "frequent_changes": "Análise de mudanças frequentes de emprego",
+        "frequent_changes_signal": "Sinais de mudanças frequentes",
+        "frequent_changes_missing": "Pontos de mudanças frequentes em falta"
+    }},
+    "evolution_roadmap": {{
+        "quick_wins": "Recomendações de melhorias rápidas",
+        "medium_term": "Recomendações de melhorias a médio prazo",
+        "long_term": "Recomendações de melhorias a longo prazo"
+    }},
+    "radar_data": {{
+        "estrutura": "Score de estrutura (0-20)",
+        "conteudo": "Score de conteúdo (0-20)",
+        "ats": "Score de ATS (0-20)",
+        "impacto": "Score de impacto (0-20)",
+        "branding": "Score de branding (0-20)",
+        "riscos": "Score de riscos (0-20)"
+    }},
+    "analysis_type": "gemini"
+}}
+
+Por favor, garanta que a saída é um JSON válido e que todos os campos são preenchidos com base na análise do CV. Se um campo não for aplicável ou não puder ser determinado, use 'N/D' ou uma string vazia, mas **nunca omita um campo**.
 
     def analyze(self, file_stream, filename, role, experience_level):
         """Analisa o CV e retorna um dicionário com os resultados."""
