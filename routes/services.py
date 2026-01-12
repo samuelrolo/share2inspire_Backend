@@ -563,6 +563,14 @@ def deliver_report():
             "sentence_improvements": []
         }
         ensure_keys(report_data, required_structure)
+        
+        # VALIDAÇÃO ADICIONAL: Limpar detected_name se contiver texto bruto
+        if 'candidate_profile' in report_data and 'detected_name' in report_data['candidate_profile']:
+            detected_name = report_data['candidate_profile']['detected_name']
+            # Se o nome tiver mais de 100 caracteres, é texto bruto do CV, não um nome
+            if len(detected_name) > 100:
+                print(f"[AVISO] detected_name contém texto bruto ({len(detected_name)} caracteres). Substituindo pelo nome do formulário.")
+                report_data['candidate_profile']['detected_name'] = name or "Candidato"
         # -----------------------------------------
         
         cv_file = request.files.get("cv_file")
