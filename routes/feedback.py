@@ -24,8 +24,8 @@ VERIFIED_SENDER_EMAIL = os.getenv("BREVO_SENDER_EMAIL", "srshare2inspire@gmail.c
 VERIFIED_SENDER_NAME = os.getenv("BREVO_SENDER_NAME", "Share2Inspire")
 
 # Email do destinatário (admin) - E-MAIL CORRIGIDO
-ADMIN_EMAIL = "srshare2inspire@gmail.com"
-ADMIN_NAME = "Share2Inspire Admin"
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "marleneruivonutricao@gmail.com")
+ADMIN_NAME = os.getenv("ADMIN_NAME", "Dra. Marlene Ruivo")
 
 # Lazy initialization for Brevo API
 _api_instance = None
@@ -200,9 +200,13 @@ def submit_feedback():
         user_email = data.get("email", "Não fornecido")
         user_name = data.get("name", "Utilizador Anónimo")
         
+        # Permitir sobrescrever o destinatário via request (útil para multi-tenant)
+        target_email = data.get("admin_email", ADMIN_EMAIL)
+        target_name = data.get("admin_name", ADMIN_NAME)
+        
         # Construir o email com formato melhorado
         send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-            to=[{"email": ADMIN_EMAIL, "name": ADMIN_NAME}],
+            to=[{"email": target_email, "name": target_name}],
             sender={"email": VERIFIED_SENDER_EMAIL, "name": VERIFIED_SENDER_NAME},
             subject="Novo Feedback Recebido - Share2Inspire",
             html_content=f"""
