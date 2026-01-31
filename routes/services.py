@@ -317,6 +317,21 @@ def analyze_cv():
             return jsonify({"success": False, "error": report["error"]}), 400
 
         logger.info("Retornando resultado com sucesso")
+        
+        # Registar análise no Supabase para tracking
+        try:
+            from utils.analytics import CVAnalytics
+            analytics = CVAnalytics()
+            analytics.log_analysis(
+                user_name=name,
+                user_email=data.get('email', ''),
+                analysis_result=report,
+                payment_status='pending'
+            )
+            logger.info("Análise registada no Supabase com sucesso")
+        except Exception as e:
+            logger.warning(f"Erro ao registar análise no Supabase: {e}")
+        
         logger.info("="*50)
         
         # Retornar análise diretamente (SEM pagamento)
