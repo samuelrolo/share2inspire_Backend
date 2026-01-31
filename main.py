@@ -49,7 +49,7 @@ if feedback_bp:
     app.register_blueprint(feedback_bp, url_prefix='/api/feedback')
 
 # /api/analytics/...
-app.register_blueprint(analytics_bp, url_prefix='')
+app.register_blueprint(analytics_bp, url_prefix='/api/analytics')
 
 
 # === ROTAS DE SAÚDE ===
