@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from routes.payment import payment_bp
 from routes.booking import booking_bp
 from routes.services import services_bp
+from routes.analytics_routes import analytics_bp
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO)
@@ -46,6 +47,9 @@ app.register_blueprint(services_bp, url_prefix='/api/services')
 from routes.feedback import feedback_bp
 if feedback_bp:
     app.register_blueprint(feedback_bp, url_prefix='/api/feedback')
+
+# /api/analytics/...
+app.register_blueprint(analytics_bp, url_prefix='')
 
 
 # === ROTAS DE SAÚDE ===
