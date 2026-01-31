@@ -265,10 +265,11 @@ class ReportPDFGenerator:
         /* Services */
         .services-table { width: 100%; border-collapse: collapse; margin: 15pt 0; }
         .services-table td { width: 33%; padding: 12pt; text-align: center; vertical-align: top; border: 1pt solid #e9ecef; }
-        .service-icon { font-size: 20pt; color: #BF9A33; margin-bottom: 8pt; }
+        .service-icon { font-size: 36pt; color: #BF9A33; margin-bottom: 12pt; }
         .service-title { font-size: 11pt; font-weight: bold; color: #1A1A1A; margin-bottom: 6pt; }
-        .service-desc { font-size: 9pt; color: #6c757d; }
-        .service-link { font-size: 9pt; color: #BF9A33; font-weight: bold; margin-top: 8pt; }
+        .service-desc { font-size: 9pt; color: #6c757d; line-height: 1.4; }
+        .service-link { font-size: 9pt; color: #BF9A33; font-weight: bold; margin-top: 8pt; text-decoration: none; }
+        .service-link:hover { text-decoration: underline; }
         
         /* Footer */
         .page-footer { position: fixed; bottom: 0; left: 0; right: 0; font-size: 7pt; color: #adb5bd; padding: 8pt 0; }
@@ -702,22 +703,22 @@ class ReportPDFGenerator:
 <table class="services-table">
     <tr>
         <td>
-            <div class="service-icon">⚡</div>
+            <div class="service-icon">🚀</div>
             <div class="service-title">Kickstart Pro</div>
             <div class="service-desc">Sessão estratégica de 1h para desbloquear decisões críticas de carreira.</div>
-            <div class="service-link">Saber Mais →</div>
+            <a href="https://share2inspire.pt/pages/servicos.html#kickstart" class="service-link">Saber Mais →</a>
         </td>
         <td>
-            <div class="service-icon">★</div>
+            <div class="service-icon">🎯</div>
             <div class="service-title">Mentoria de Carreira</div>
             <div class="service-desc">Programa de acompanhamento personalizado para objetivos ambiciosos.</div>
-            <div class="service-link">Saber Mais →</div>
+            <a href="https://share2inspire.pt/pages/servicos.html#mentoria" class="service-link">Saber Mais →</a>
         </td>
         <td>
-            <div class="service-icon">◎</div>
+            <div class="service-icon">💼</div>
             <div class="service-title">Revisão de LinkedIn</div>
             <div class="service-desc">Otimização do perfil para máxima visibilidade e atração de recrutadores.</div>
-            <div class="service-link">Saber Mais →</div>
+            <a href="https://share2inspire.pt/pages/servicos.html#linkedin" class="service-link">Saber Mais →</a>
         </td>
     </tr>
 </table>
