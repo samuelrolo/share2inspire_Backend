@@ -164,10 +164,7 @@ class ReportPDFGenerator:
             'gray_medium': '#6c757d',
             'gray_light': '#e9ecef',
             'gray_bg': '#f8f9fa',
-            'white': '#FFFFFF',
-            'success': '#27ae60',
-            'warning': '#f39c12',
-            'danger': '#e74c3c'
+            'white': '#FFFFFF'
         }
 
     def _get_template(self):
