@@ -15,12 +15,55 @@ from jinja2 import Template
 class ReportPDFGenerator:
     """Gerador de relatórios PDF com design premium e análises aprofundadas."""
     
+    def _clean_array_text(self, text):
+        """Remove colchetes, aspas e formatação de array do texto."""
+        if not text:
+            return text
+        
+        import re
+        
+        # Se for uma lista Python, converter para string
+        if isinstance(text, list):
+            text = '. '.join(str(item) for item in text)
+        
+        # Converter para string se não for
+        text = str(text)
+        
+        # Remover colchetes de abertura e fecho
+        text = text.strip()
+        if text.startswith('[') and text.endswith(']'):
+            text = text[1:-1]
+        
+        # Remover padrões de array JSON: ["item1", "item2"]
+        text = re.sub(r'^\["', '', text)
+        text = re.sub(r'"\]$', '', text)
+        text = re.sub(r'",\s*"', '. ', text)
+        
+        # Remover padrões de array com aspas simples: ['item1', 'item2']
+        text = re.sub(r"^\['", '', text)
+        text = re.sub(r"'\]$", '', text)
+        text = re.sub(r"',\s*'", '. ', text)
+        
+        # Remover aspas soltas no início e fim
+        text = text.strip('"\'')
+        
+        # Remover asteriscos de bold markdown
+        text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+        
+        # Limpar espaços duplos
+        text = re.sub(r'\s+', ' ', text)
+        
+        return text.strip()
+    
     def _convert_to_bullets(self, text):
         """Converte texto com marcadores markdown para HTML com bullets."""
         if not text:
             return '<p class="no-items">Análise não disponível.</p>'
         
         import re
+        
+        # Primeiro, limpar colchetes e arrays
+        text = self._clean_array_text(text)
         
         # Converter **texto** para <strong>texto</strong>
         text = re.sub(r'\*\*([^*]+)\*\*', r'<strong class="insight-key">\1</strong>', text)

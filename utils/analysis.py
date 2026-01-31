@@ -87,6 +87,19 @@ class CVAnalyzer:
     def _build_analysis_prompt(self, role, experience_level):
         """Constrói o prompt para análise com Gemini."""
         return f"""Analisa este CV de forma profissional e detalhada para a função de '{role}' com nível '{experience_level}'.
+
+IMPORTANTE - REGRAS DE IDIOMA:
+1. Escreve SEMPRE em Português de Portugal (PT-PT), NUNCA em Português do Brasil
+2. NÃO uses gerúndios - usa "a fazer" em vez de "fazendo", "a liderar" em vez de "liderando"
+3. Usa vocabulário PT-PT: "equipa" (não "time"), "gestão" (não "gerenciamento"), "colaborador" (não "funcionário")
+4. Termos técnicos em inglês são aceitáveis (HR, ATS, skills, LinkedIn, etc.)
+5. NUNCA uses "você" - usa "o candidato", "o profissional" ou construções impessoais
+
+IMPORTANTE - FORMATO:
+1. Todos os campos de texto devem ser STRINGS contínuas, NÃO arrays
+2. Para listas, usa texto com "- " no início de cada item, separados por \n
+3. NÃO uses colchetes [ ] nos campos de texto
+4. NÃO uses asteriscos ** para bold
         
 Retorna APENAS um JSON válido (sem markdown) com esta estrutura exata:
 {{
@@ -105,51 +118,51 @@ Retorna APENAS um JSON válido (sem markdown) com esta estrutura exata:
     }},
     "executive_summary": {{
         "global_score": "75",
-        "market_positioning": "Análise detalhada do posicionamento...",
-        "key_decision_factors": "Fatores de decisão detalhados..."
+        "market_positioning": "Análise detalhada do posicionamento em texto corrido, sem colchetes...",
+        "key_decision_factors": "Fatores de decisão detalhados em texto corrido..."
     }},
     "diagnostic_impact": {{
-        "first_30_seconds_read": "O que um recrutador vê nos primeiros 30 segundos...",
-        "impact_strengths": "- Ponto forte 1\\n- Ponto forte 2\\n- Ponto forte 3",
-        "impact_dilutions": "- Ponto de diluição 1\\n- Ponto de diluição 2"
+        "first_30_seconds_read": "O que um recrutador vê nos primeiros 30 segundos em texto corrido...",
+        "impact_strengths": "Primeiro ponto forte relevante. Segundo ponto forte com detalhe. Terceiro ponto que demonstra valor.",
+        "impact_dilutions": "Primeiro ponto de diluição identificado. Segundo aspeto a melhorar."
     }},
     "content_structure_analysis": {{
-        "organization_hierarchy": "Análise da organização e hierarquia do CV...",
+        "organization_hierarchy": "Análise da organização e hierarquia do CV em texto corrido...",
         "responsibilities_results_balance": "Análise do equilíbrio entre responsabilidades e resultados...",
         "orientation": "Orientação geral do CV..."
     }},
     "ats_digital_recruitment": {{
-        "compatibility": "Análise de compatibilidade ATS...",
-        "filtering_risks": "Riscos de filtragem automática...",
+        "compatibility": "Análise de compatibilidade ATS em texto corrido...",
+        "filtering_risks": "Riscos de filtragem automática descritos em texto corrido...",
         "alignment": "Alinhamento com práticas de recrutamento..."
     }},
     "skills_differentiation": {{
-        "technical_behavioral_analysis": "Análise técnica vs comportamental...",
-        "differentiation_factors": "Fatores de diferenciação...",
-        "common_undifferentiated": "Competências comuns..."
+        "technical_behavioral_analysis": "Análise técnica vs comportamental em texto corrido...",
+        "differentiation_factors": "Fatores de diferenciação descritos em texto corrido...",
+        "common_undifferentiated": "Competências comuns descritas em texto corrido..."
     }},
     "strategic_risks": {{
-        "identified_risks": "- Risco 1\\n- Risco 2\\n- Risco 3"
+        "identified_risks": "Primeiro risco estratégico identificado. Segundo risco com impacto potencial. Terceiro risco a considerar."
     }},
     "languages_analysis": {{
-        "languages_assessment": "Avaliação dos idiomas..."
+        "languages_assessment": "Avaliação dos idiomas em texto corrido..."
     }},
     "education_analysis": {{
-        "education_assessment": "Avaliação da formação..."
+        "education_assessment": "Avaliação da formação em texto corrido..."
     }},
     "phrase_improvements": [
         {{
             "category": "Descrição de Função",
             "before": "Frase original do CV",
-            "after": "Frase melhorada",
+            "after": "Frase melhorada em Português de Portugal",
             "justification": "Razão da melhoria"
         }}
     ],
     "pdf_extended_content": {{
         "sector_analysis": {{
             "identified_sector": "Setor",
-            "sector_trends": "Tendências do setor...",
-            "competitive_landscape": "Panorama competitivo..."
+            "sector_trends": "Tendências do setor em texto corrido...",
+            "competitive_landscape": "Panorama competitivo em texto corrido..."
         }},
         "critical_certifications": [
             {{
@@ -157,18 +170,18 @@ Retorna APENAS um JSON válido (sem markdown) com esta estrutura exata:
                 "issuer": "Entidade",
                 "priority": "Alta",
                 "estimated_investment": "€500-1000",
-                "relevance": "Relevância para a carreira..."
+                "relevance": "Relevância para a carreira em texto corrido..."
             }}
         ]
     }},
     "priority_recommendations": {{
-        "immediate_adjustments": "- Ajuste 1\\n- Ajuste 2\\n- Ajuste 3",
-        "refinement_areas": "- Área 1\\n- Área 2",
-        "deep_repositioning": "- Reposicionamento 1\\n- Reposicionamento 2"
+        "immediate_adjustments": "Primeiro ajuste imediato recomendado. Segundo ajuste prioritário. Terceiro ajuste a implementar.",
+        "refinement_areas": "Primeira área de refinamento. Segunda área a desenvolver.",
+        "deep_repositioning": "Primeira sugestão de reposicionamento. Segunda estratégia de longo prazo."
     }},
     "executive_conclusion": {{
-        "potential_after_improvements": "Potencial após implementar melhorias...",
-        "expected_competitiveness": "Competitividade esperada no mercado..."
+        "potential_after_improvements": "Potencial após implementar melhorias em texto corrido...",
+        "expected_competitiveness": "Competitividade esperada no mercado em texto corrido..."
     }},
     "radar_data": {{
         "estrutura": 14,
