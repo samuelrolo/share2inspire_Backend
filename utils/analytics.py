@@ -257,6 +257,33 @@ class CVAnalytics:
         except Exception as e:
             return {"success": False, "error": str(e), "total_analyses": 0}
 
+    def log_google_ads_lead(self, lead_data):
+        """
+        Regista um lead vindo do Google Ads.
+        
+        Args:
+            lead_data: Dados do lead formatados
+            
+        Returns:
+            dict: Resultado da operação
+        """
+        try:
+            response = requests.post(
+                f"{SUPABASE_URL}/rest/v1/google_ads_leads",
+                json=lead_data,
+                headers={**self.headers, "Prefer": "return=representation"}
+            )
+            
+            if response.status_code in [200, 201]:
+                return {"success": True}
+            else:
+                print(f"[ERRO] Falha ao registar lead Google Ads: {response.text}")
+                return {"success": False, "error": response.text}
+                
+        except Exception as e:
+            print(f"[ERRO] Exceção ao registar lead Google Ads: {e}")
+            return {"success": False, "error": str(e)}
+
 
 # Instância global para uso fácil
 analytics = CVAnalytics()

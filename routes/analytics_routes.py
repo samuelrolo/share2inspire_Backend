@@ -4,6 +4,7 @@ Rotas de Analytics para CV Analyzer - Share2Inspire
 API endpoints para consulta de estatísticas
 """
 
+from datetime import datetime
 from flask import Blueprint, jsonify, request
 from utils.analytics import analytics
 
@@ -131,10 +132,60 @@ def get_count():
     }), 200
 
 
+@analytics_bp.route('/api/analytics/webhook-leads', methods=['POST'])
+def google_ads_webhook():
+    """
+    Webhook para receber leads do Google Ads.
+    """
+    # Verificar chave de segurança (opcional mas recomendado)
+    google_key = request.args.get('key')
+    expected_key = "s2i_google_ads_2026_secure"
+    
+    if google_key != expected_key:
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+        
+    data = request.json
+    if not data:
+        return jsonify({"success": False, "error": "No data received"}), 400
+        
+    # Mapear campos do Google Ads (exemplo baseado na estrutura padrão)
+    # O Google envia uma lista de user_column_data
+    user_data = {}
+    for column in data.get('user_column_data', []):
+        column_id = column.get('column_id')
+        column_value = column.get('string_value')
+        
+        if column_id == 'EMAIL':
+            user_data['user_email'] = column_value
+        elif column_id == 'FULL_NAME':
+            user_data['user_name'] = column_value
+        elif column_id == 'PHONE_NUMBER':
+            user_data['user_phone'] = column_value
+            
+    lead_entry = {
+        "lead_id": data.get('lead_id'),
+        "user_email": user_data.get('user_email'),
+        "user_name": user_data.get('user_name'),
+        "user_phone": user_data.get('user_phone'),
+        "campaign_id": data.get('campaign_id'),
+        "adgroup_id": data.get('adgroup_id'),
+        "creative_id": data.get('creative_id'),
+        "raw_data": data,
+        "created_at": datetime.utcnow().isoformat()
+    }
+    
+    result = analytics.log_google_ads_lead(lead_entry)
+    
+    if result["success"]:
+        return jsonify({"success": True, "message": "Lead registered"}), 200
+    else:
+        return jsonify({"success": False, "error": result.get("error")}), 500
+
+
 # CORS headers para todos os endpoints
 @analytics_bp.after_request
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
     return response
