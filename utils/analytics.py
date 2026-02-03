@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 # Configuração Supabase
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://cvlumvgrbuolrnwrtrgz.supabase.co")
-SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2bHVtdmdyYnVvbHJud3J0cmd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzNjQyNzMsImV4cCI6MjA4Mzk0MDI3M30.DAowq1KK84KDJEvHL-0ztb-zN6jyeC1qVLLDMpTaRLM")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2bHVtdmdyYnVvbHJud3J0cmd6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2ODM2NDI3MywiZXhwIjoyMDgzOTQwMjczfQ.71rOpHDasxhT4QUn9rKVT-Nv0OlH3x9uBs7H2ZkFPGY")
 
 
 class CVAnalytics:
@@ -121,6 +121,41 @@ class CVAnalytics:
                 return {"success": False, "error": response.text}
                 
         except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def update_payment_status_by_email(self, user_email, payment_status="paid", payment_amount=None):
+        """
+        Updates the payment status of the most recent analysis for a given email.
+        Useful when we don't have the analysis_id but have the user's email.
+        """
+        try:
+            # 1. Find the most recent analysis for this email
+            response = requests.get(
+                f"{SUPABASE_URL}/rest/v1/cv_analysis?user_email=eq.{user_email}&order=created_at.desc&limit=1",
+                headers=self.headers
+            )
+            
+            if response.status_code != 200:
+                print(f"[ANALYTICS] Error finding analysis by email: {response.text}")
+                return {"success": False, "error": response.text}
+                
+            data = response.json()
+            if not data:
+                print(f"[ANALYTICS] No analysis found for email: {user_email}")
+                return {"success": False, "error": "Analysis not found"}
+                
+            analysis_id = data[0]['id']
+            print(f"[ANALYTICS] Found analysis {analysis_id} for email {user_email}. Updating status...")
+            
+            # 2. Update status
+            return self.update_payment_status(
+                analysis_id=analysis_id, 
+                payment_status=payment_status, 
+                payment_amount=payment_amount
+            )
+            
+        except Exception as e:
+            print(f"[ANALYTICS] Exception updating by email: {e}")
             return {"success": False, "error": str(e)}
     
     def get_summary_stats(self):

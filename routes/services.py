@@ -367,6 +367,7 @@ def request_report_payment():
             get_email_confirmacao_pedido,
             get_email_pagamento_mbway
         )
+        from utils.datastore_client import get_datastore_client
         
         print("Endpoint /api/services/request-report-payment chamado")
         
@@ -374,6 +375,7 @@ def request_report_payment():
         email = data.get('email', '')
         name = data.get('name', 'Candidato')
         phone = data.get('phone', '')
+        analysis_data = data.get('analysis_data', {})
         
         if not all([email, phone]):
             return jsonify({"success": False, "error": "Email e Telemóvel são obrigatórios"}), 400
@@ -412,7 +414,7 @@ def request_report_payment():
         # >>> 2. Criar pagamento MB WAY <<<
         timestamp = int(datetime.now().timestamp())
         payment_data = {
-            "amount": "1.00",
+            "amount": "2.99",
             "orderId": f"CVA-{name.replace(' ', '')}-{timestamp}",
             "phone": phone,
             "email": email,
@@ -424,6 +426,20 @@ def request_report_payment():
         
         if not payment_result.get('success'):
            return jsonify({"success": False, "error": f"Erro MB WAY: {payment_result.get('error')}"}), 400
+
+        # >>> 2.5 SALVAR NO DATASTORE (CRÍTICO) <<<
+        get_datastore_client().save_payment_record(
+            order_id=payment_data['orderId'],
+            payment_data=payment_result,
+            user_data={
+                "name": name,
+                "email": email,
+                "phone": phone,
+                "description": payment_data['description']
+            },
+            analysis_data=analysis_data
+        )
+        print(f"[REQUEST-PAYMENT] Registo guardado para {payment_data['orderId']}")
 
         # >>> 3. Enviar EMAIL 2: Pagamento MB Way <<<
         payment_link = payment_result.get("payment_url", f"https://share2inspire.pt/pages/pagamento.html?orderId={payment_data.get('orderId')}")
@@ -765,6 +781,90 @@ def kickstart_confirm():
     except Exception as e:
         print(f"Erro Kickstart Confirm: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+def deliver_report_internal(order_id, analysis_data, user_data):
+    """
+    Internal function to deliver report after confirmed payment.
+    Handles distinct inputs from the public endpoint.
+    """
+    try:
+        import base64
+        import tempfile
+        import os
+        from utils.report_pdf import ReportPDFGenerator
+        from utils.analytics import analytics
+        from email_templates.transactional_emails import get_email_entrega_relatorio
+        
+        print(f"[INTERNAL DELIVERY] Processing order {order_id}")
+        name = user_data.get('name', 'Cliente')
+        email = user_data.get('email')
+
+        if not email:
+            return {"success": False, "error": "Email required"}
+
+        # 1. Generate PDF
+        generator = ReportPDFGenerator()
+        
+        # Generate radar chart (reusing logic from public endpoint)
+        radar_scores = {
+            "Estrutura": analysis_data.get("executive_summary", {}).get("global_score_breakdown", {}).get("structure_clarity", 0),
+            "Conteúdo": analysis_data.get("executive_summary", {}).get("global_score_breakdown", {}).get("content_relevance", 0),
+            "Consistência": analysis_data.get("executive_summary", {}).get("global_score_breakdown", {}).get("risks_inconsistencies", 0),
+            "ATS": analysis_data.get("executive_summary", {}).get("global_score_breakdown", {}).get("ats_compatibility", 0),
+            "Impacto": analysis_data.get("executive_summary", {}).get("global_score_breakdown", {}).get("impact_results", 0),
+            "Marca Pessoal": analysis_data.get("executive_summary", {}).get("global_score_breakdown", {}).get("personal_brand", 0)
+        }
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_radar:
+            radar_chart_path = tmp_radar.name
+            create_radar_chart(radar_scores, radar_chart_path)
+
+        pdf_buffer, pdf_filename = generator.create_pdf(analysis_data, radar_chart_path=radar_chart_path)
+        pdf_bytes = pdf_buffer.getvalue()
+        
+        # Cleanup
+        if os.path.exists(radar_chart_path):
+            os.unlink(radar_chart_path)
+        
+        # 2. Attachments (PDF Report ONLY - CV not available in this flow yet)
+        safe_name = name.replace(" ", "_")
+        attachments = [
+            {
+                "content": base64.b64encode(pdf_bytes).decode('utf-8'),
+                "name": f"Relatorio_Analise_CV_{safe_name}.pdf"
+            }
+        ]
+
+        # 3. Send Email
+        subject_3, body_3 = get_email_entrega_relatorio(
+            nome=name,
+            nome_do_servico="CV Analyzer"
+        )
+        
+        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+            to=[{"email": email, "name": name}],
+            bcc=[{"email": "srshare2inspire@gmail.com", "name": "Admin Share2Inspire"}],
+            sender={"email": os.getenv("BREVO_SENDER_EMAIL", "srshare2inspire@gmail.com"), "name": "Share2Inspire"},
+            subject=subject_3,
+            html_content=body_3.replace('\n', '<br>'),
+            attachment=attachments
+        )
+        
+        api_instance = get_brevo_api()
+        api_instance.send_transac_email(send_smtp_email)
+        print(f"[INTERNAL DELIVERY] Email sent to {email}")
+
+        # 4. UPDATE ANALYTICS STATUS
+        print(f"[INTERNAL DELIVERY] Updating analytics for {email}")
+        analytics.update_payment_status_by_email(email, "paid", user_data.get('amount'))
+
+        return {"success": True}
+
+    except Exception as e:
+        print(f"[INTERNAL DELIVERY] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "error": str(e)}
 
 def create_radar_chart(scores, output_path):
     labels = list(scores.keys())

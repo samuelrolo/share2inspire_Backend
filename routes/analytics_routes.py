@@ -11,7 +11,7 @@ from utils.analytics import analytics
 analytics_bp = Blueprint('analytics', __name__)
 
 
-@analytics_bp.route('/api/analytics/summary', methods=['GET'])
+@analytics_bp.route('/summary', methods=['GET'])
 def get_summary():
     """
     Endpoint para obter estatísticas resumidas.
@@ -41,7 +41,7 @@ def get_summary():
         }), 500
 
 
-@analytics_bp.route('/api/analytics/daily', methods=['GET'])
+@analytics_bp.route('/daily', methods=['GET'])
 def get_daily():
     """
     Endpoint para obter estatísticas diárias.
@@ -67,7 +67,7 @@ def get_daily():
         }), 500
 
 
-@analytics_bp.route('/api/analytics/areas', methods=['GET'])
+@analytics_bp.route('/areas', methods=['GET'])
 def get_areas():
     """
     Endpoint para obter estatísticas por área profissional.
@@ -89,7 +89,7 @@ def get_areas():
         }), 500
 
 
-@analytics_bp.route('/api/analytics/recent', methods=['GET'])
+@analytics_bp.route('/recent', methods=['GET'])
 def get_recent():
     """
     Endpoint para obter análises recentes.
@@ -115,7 +115,7 @@ def get_recent():
         }), 500
 
 
-@analytics_bp.route('/api/analytics/count', methods=['GET'])
+@analytics_bp.route('/count', methods=['GET'])
 def get_count():
     """
     Endpoint para contador em tempo real (para landing page).
@@ -132,7 +132,7 @@ def get_count():
     }), 200
 
 
-@analytics_bp.route('/api/analytics/webhook-leads', methods=['POST'])
+@analytics_bp.route('/webhook-leads', methods=['POST'])
 def google_ads_webhook():
     """
     Webhook para receber leads do Google Ads.
