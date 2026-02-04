@@ -393,23 +393,9 @@ def request_report_payment():
                 "skipPayment": True
             }), 200
         
-        # >>> 1. Enviar EMAIL 1: Confirmação de Pedido <<<
-        data_pedido = datetime.now().strftime('%d/%m/%Y')
-        subject_1, body_1 = get_email_confirmacao_pedido(
-            nome=name,
-            nome_do_servico="CV Analyzer",
-            data_pedido=data_pedido
-        )
-        
-        try:
-            get_brevo_api().send_transac_email(sib_api_v3_sdk.SendSmtpEmail(
-                to=[{"email": email, "name": name}],
-                sender=BREVO_SENDER,
-                subject=subject_1,
-                html_content=body_1.replace('\n', '<br>')
-            ))
-        except ApiException as e:
-            print(f"Aviso: Erro ao enviar EMAIL 1: {e}")
+        # >>> EMAILS OBSOLETOS REMOVIDOS <<<
+        # O pagamento é feito no ecrã, não enviamos emails de pedido
+        # O email correto (com CV e relatório) é enviado após confirmação via deliver_report_internal()
         
         # >>> 2. Criar pagamento MB WAY <<<
         timestamp = int(datetime.now().timestamp())
@@ -441,26 +427,9 @@ def request_report_payment():
         )
         print(f"[REQUEST-PAYMENT] Registo guardado para {payment_data['orderId']}")
 
-        # >>> 3. Enviar EMAIL 2: Pagamento MB Way <<<
-        payment_link = payment_result.get("payment_url", f"https://share2inspire.pt/pages/pagamento.html?orderId={payment_data.get('orderId')}")
-        
-        subject_2, body_2 = get_email_pagamento_mbway(
-            nome=name,
-            nome_do_servico="CV Analyzer",
-            valor="2.99€",
-            prazo_entrega="Imediato (após confirmação)",
-            link_pagamento_mbway=payment_link
-        )
-        
-        try:
-            get_brevo_api().send_transac_email(sib_api_v3_sdk.SendSmtpEmail(
-                to=[{"email": email, "name": name}],
-                sender=BREVO_SENDER,
-                subject=subject_2,
-                html_content=body_2.replace('\n', '<br>')
-            ))
-        except ApiException as e:
-            print(f"Aviso: Erro ao enviar EMAIL 2: {e}")
+        # >>> EMAIL 2 REMOVIDO (OBSOLETO) <<<
+        # O email de entrega (com anexos) é enviado após confirmação de pagamento
+        # via deliver_report_internal() no webhook
 
         return jsonify({
             "success": True,
