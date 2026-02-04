@@ -42,7 +42,7 @@ class DatastoreClient:
             return self._client.key('PaymentRecord', order_id)
         return order_id
     
-    def save_payment_record(self, order_id: str, payment_data: dict, user_data: dict, analysis_data: dict = None) -> bool:
+    def save_payment_record(self, order_id: str, payment_data: dict, user_data: dict, analysis_data: dict = None, cv_data: dict = None) -> bool:
         """Guardar registo de pagamento"""
         try:
             record = {
@@ -50,6 +50,7 @@ class DatastoreClient:
                 'payment_data': payment_data,
                 'user_data': user_data,
                 'analysis_data': analysis_data,
+                'cv_data': cv_data,  # ✅ CV base64 data
                 'created_at': datetime.now().isoformat(),
                 'payment_status': 'pending',
                 'delivered': False

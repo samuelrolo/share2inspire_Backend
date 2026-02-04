@@ -363,19 +363,35 @@ def request_report_payment():
     try:
         from routes.payment import create_mbway_payment, normalize_payment_data
         from datetime import datetime
-        from email_templates.transactional_emails import (
-            get_email_confirmacao_pedido,
-            get_email_pagamento_mbway
-        )
         from utils.datastore_client import get_datastore_client
+        import base64
         
         print("Endpoint /api/services/request-report-payment chamado")
         
-        data = request.get_json()
-        email = data.get('email', '')
-        name = data.get('name', 'Candidato')
-        phone = data.get('phone', '')
-        analysis_data = data.get('analysis_data', {})
+        # >>> ACCEPT FORMDATA with CV file <<<
+        email = request.form.get('email', '')
+        name = request.form.get('name', 'Candidato')
+        phone = request.form.get('phone', '')
+        analysis_data_str = request.form.get('analysis_data', '{}')
+        analysis_data = json.loads(analysis_data_str) if analysis_data_str else {}
+        
+        # Extract CV file
+        cv_file = request.files.get('cv_file')
+        cv_data = None
+        
+        if cv_file:
+            print(f"[CV FILE] Recebido: {cv_file.filename}, tipo: {cv_file.content_type}")
+            # Convert to base64 for storage
+            cv_bytes = cv_file.read()
+            cv_base64 = base64.b64encode(cv_bytes).decode('utf-8')
+            cv_data = {
+                'base64': cv_base64,
+                'filename': cv_file.filename,
+                'content_type': cv_file.content_type
+            }
+            print(f"[CV FILE] Convertido para base64 ({len(cv_base64)} chars)")
+        else:
+            print("[CV FILE] AVISO: Nenhum CV file recebido!")
         
         if not all([email, phone]):
             return jsonify({"success": False, "error": "Email e Telemóvel são obrigatórios"}), 400
@@ -413,7 +429,7 @@ def request_report_payment():
         if not payment_result.get('success'):
            return jsonify({"success": False, "error": f"Erro MB WAY: {payment_result.get('error')}"}), 400
 
-        # >>> 2.5 SALVAR NO DATASTORE (CRÍTICO) <<<
+        # >>> 2.5 SALVAR NO DATASTORE COM CV FILE (CRÍTICO) <<<
         get_datastore_client().save_payment_record(
             order_id=payment_data['orderId'],
             payment_data=payment_result,
@@ -423,9 +439,10 @@ def request_report_payment():
                 "phone": phone,
                 "description": payment_data['description']
             },
-            analysis_data=analysis_data
+            analysis_data=analysis_data,
+            cv_data=cv_data  # ✅ CV em base64 guardado!
         )
-        print(f"[REQUEST-PAYMENT] Registo guardado para {payment_data['orderId']}")
+        print(f"[REQUEST-PAYMENT] Registo guardado para {payment_data['orderId']} {'COM CV' if cv_data else 'SEM CV'}")
 
         # >>> EMAIL 2 REMOVIDO (OBSOLETO) <<<
         # O email de entrega (com anexos) é enviado após confirmação de pagamento
@@ -795,7 +812,8 @@ def deliver_report_internal(order_id, analysis_data, user_data):
         if os.path.exists(radar_chart_path):
             os.unlink(radar_chart_path)
         
-        # 2. Attachments (PDF Report ONLY - CV not available in this flow yet)
+        # 2. Attachments - Include CV if stored in Datastore
+        from utils.datastore_client import get_datastore_client
         safe_name = name.replace(" ", "_")
         attachments = [
             {
@@ -803,6 +821,25 @@ def deliver_report_internal(order_id, analysis_data, user_data):
                 "name": f"Relatorio_Analise_CV_{safe_name}.pdf"
             }
         ]
+        
+        # >>> RETRIEVE CV FROM DATASTORE <<<
+        record = get_datastore_client().get_payment_record(order_id)
+        if record and record.get('cv_data'):
+            cv_data = record['cv_data']
+            cv_base64 = cv_data.get('base64')
+            cv_filename = cv_data.get('filename', 'CV_Original.pdf')
+            
+            if cv_base64:
+                # CV already in base64, just add to attachments
+                attachments.append({
+                    "content": cv_base64,
+                    "name": cv_filename
+                })
+                print(f"[INTERNAL DELIVERY] ✅ CV anexado: {cv_filename}")
+            else:
+                print("[INTERNAL DELIVERY] ⚠️ CV data sem base64")
+        else:
+            print("[INTERNAL DELIVERY] ⚠️ Nenhum CV encontrado no Datastore")
 
         # 3. Send Email
         subject_3, body_3 = get_email_entrega_relatorio(
