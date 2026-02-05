@@ -116,3 +116,19 @@ def get_email_followup_estrategico(nome):
     <strong>Equipa Share2Inspire</strong>
     """
     return subject, get_base_template(content, "Evolução Contínua")
+
+def get_email_confirmacao_consulta(nome, assunto):
+    subject = "Confirmação do seu Pedido de Consulta | Share2Inspire"
+    content = f"""
+    Olá <span class="highlight">{nome}</span>,<br><br>
+    Recebemos o seu pedido de consulta sobre "<strong>{assunto}</strong>".<br><br>
+    A nossa equipa irá analisar a sua mensagem e entrará em contacto o mais breve possível.<br><br>
+    <div class="details-box">
+        <div class="details-title">Próximos Passos</div>
+        A nossa equipa de desenvolvimento irá rever o seu pedido e responder com uma proposta personalizada nas próximas 48 horas úteis.
+    </div>
+    Obrigado pelo seu interesse nos nossos serviços!<br><br>
+    Atenciosamente,<br>
+    <strong>Equipa Share2Inspire</strong>
+    """
+    return subject, get_base_template(content, "Pedido de Consulta Recebido")

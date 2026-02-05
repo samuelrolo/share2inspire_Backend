@@ -887,3 +887,99 @@ def create_radar_chart(scores, output_path):
     ax.set_xticklabels(labels)
     plt.savefig(output_path)
     plt.close(fig)
+
+
+@services_bp.route("/pedido-consulta", methods=["POST", "OPTIONS"])
+def pedido_consulta():
+    """
+    Endpoint para receber pedidos de consulta do serviço de Criação de Conteúdos Online.
+    Envia email de confirmação ao cliente e notificação para o admin.
+    """
+    # Handle CORS preflight
+    if request.method == "OPTIONS":
+        response = jsonify({"status": "ok"})
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
+        return response, 200
+    
+    try:
+        # Obter dados do formulário
+        nome = request.form.get('nome')
+        email = request.form.get('email')
+        assunto = request.form.get('assunto')
+        mensagem = request.form.get('mensagem')
+        anexo = request.files.get('anexo')
+        
+        logger.info(f"Pedido de consulta recebido: {nome} ({email}) - {assunto}")
+        
+        # Validação de campos obrigatórios
+        if not nome or not email or not assunto or not mensagem:
+            return jsonify({"success": False, "error": "Campos obrigatórios em falta"}), 400
+        
+        # Validação de formato de email
+        import re
+        if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+            return jsonify({"success": False, "error": "Formato de email inválido"}), 400
+        
+        # Obter template de email
+        from email_templates.transactional_emails import get_email_confirmacao_consulta
+        subject, html_content = get_email_confirmacao_consulta(nome, assunto)
+        
+        # Configurar destinatários
+        recipients = [{"email": email, "name": nome}]
+        bcc = [{"email": "samuelrolo@gmail.com", "name": "Samuel Rolo"}]
+        
+        # Preparar email de confirmação para o cliente
+        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+            to=recipients,
+            bcc=bcc,
+            sender=BREVO_SENDER,
+            subject=subject,
+            html_content=html_content
+        )
+        
+        # Enviar email via Brevo
+        try:
+            get_brevo_api().send_transac_email(send_smtp_email)
+            logger.info(f"Email de confirmação enviado para {email}")
+        except ApiException as e:
+            logger.error(f"Erro ao enviar email via Brevo: {str(e)}")
+            return jsonify({"success": False, "error": "Erro ao enviar email de confirmação"}), 500
+        
+        # Enviar email de notificação para o admin com os detalhes do pedido
+        admin_subject = f"Novo Pedido de Consulta: {assunto}"
+        admin_content = f"""
+        <html><body style="font-family: Arial, sans-serif;">
+            <h2 style="color: #BF9A33;">Novo Pedido de Consulta</h2>
+            <p><strong>Nome:</strong> {nome}</p>
+            <p><strong>Email:</strong> {email}</p>
+            <p><strong>Assunto:</strong> {assunto}</p>
+            <p><strong>Mensagem:</strong></p>
+            <div style="background: #f4f4f4; padding: 15px; border-left: 3px solid #BF9A33;">
+                {mensagem.replace(chr(10), '<br>')}
+            </div>
+            <p style="margin-top: 20px; color: #666;">Recebido em: {datetime.now().strftime('%d/%m/%Y às %H:%M')}</p>
+        </body></html>
+        """
+        
+        admin_email = sib_api_v3_sdk.SendSmtpEmail(
+            to=[{"email": "samuelrolo@gmail.com", "name": "Samuel Rolo"}],
+            sender=BREVO_SENDER,
+            subject=admin_subject,
+            html_content=admin_content,
+            reply_to={"email": email, "name": nome}
+        )
+        
+        try:
+            get_brevo_api().send_transac_email(admin_email)
+            logger.info("Email de notificação enviado para o admin")
+        except ApiException as e:
+            logger.warning(f"Erro ao enviar notificação para admin: {str(e)}")
+            # Não falhar o request se apenas a notificação falhar
+        
+        return jsonify({"success": True, "message": "Pedido enviado com sucesso"}), 200
+        
+    except Exception as e:
+        logger.error(f"Erro ao processar pedido de consulta: {str(e)}")
+        return jsonify({"success": False, "error": "Erro ao processar o pedido"}), 500
