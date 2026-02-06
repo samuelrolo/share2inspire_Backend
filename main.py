@@ -13,6 +13,7 @@ from routes.payment import payment_bp
 from routes.booking import booking_bp
 from routes.services import services_bp
 from routes.analytics_routes import analytics_bp
+from routes.linkedin import linkedin_bp
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO)
@@ -50,6 +51,9 @@ if feedback_bp:
 
 # /api/analytics/...
 app.register_blueprint(analytics_bp, url_prefix='/api/analytics')
+
+# /api/linkedin/...
+app.register_blueprint(linkedin_bp, url_prefix='/api/linkedin')
 
 
 # === ROTAS DE SAÚDE ===
