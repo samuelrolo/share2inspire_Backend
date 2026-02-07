@@ -12,13 +12,9 @@ logger = logging.getLogger(__name__)
 
 linkedin_bp = Blueprint('linkedin', __name__)
 
-# LinkedIn API Configuration
+# LinkedIn API Configuration (OpenID Connect)
 LINKEDIN_TOKEN_URL = 'https://www.linkedin.com/oauth/v2/accessToken'
-LINKEDIN_PROFILE_URL = 'https://api.linkedin.com/v2/me'
-LINKEDIN_EMAIL_URL = 'https://api.linkedin.com/v2/emailAddress?q=members&projection=(elements*(handle~))'
-LINKEDIN_POSITIONS_URL = 'https://api.linkedin.com/v2/positions?q=members&projection=(elements*(company,title,timePeriod,description))'
-LINKEDIN_EDUCATION_URL = 'https://api.linkedin.com/v2/educations?q=members&projection=(elements*(schoolName,degreeName,fieldOfStudy,timePeriod))'
-LINKEDIN_SKILLS_URL = 'https://api.linkedin.com/v2/skills?q=members&projection=(elements*(name))'
+LINKEDIN_USERINFO_URL = 'https://api.linkedin.com/v2/userinfo'
 
 
 @linkedin_bp.route('/import', methods=['POST', 'OPTIONS'])
@@ -77,66 +73,30 @@ def import_linkedin_data():
         
         headers = {'Authorization': f'Bearer {access_token}'}
         
-        # Step 2: Fetch profile data
-        profile_response = requests.get(LINKEDIN_PROFILE_URL, headers=headers, timeout=30)
-        email_response = requests.get(LINKEDIN_EMAIL_URL, headers=headers, timeout=30)
+        # Step 2: Fetch user info (OpenID Connect)
+        userinfo_response = requests.get(LINKEDIN_USERINFO_URL, headers=headers, timeout=30)
         
-        if not profile_response.ok:
-            logger.error(f'LinkedIn profile fetch failed: {profile_response.text}')
+        if not userinfo_response.ok:
+            logger.error(f'LinkedIn userinfo fetch failed: {userinfo_response.text}')
             return jsonify({'error': 'Failed to fetch LinkedIn profile'}), 500
         
-        profile = profile_response.json()
-        email_data = email_response.json() if email_response.ok else {}
-        email = email_data.get('elements', [{}])[0].get('handle~', {}).get('emailAddress', '')
+        userinfo = userinfo_response.json()
+        logger.info(f'LinkedIn userinfo received: {userinfo}')
         
-        # Step 3: Fetch additional data (optional, may fail due to permissions)
-        positions_response = requests.get(LINKEDIN_POSITIONS_URL, headers=headers, timeout=30)
-        education_response = requests.get(LINKEDIN_EDUCATION_URL, headers=headers, timeout=30)
-        skills_response = requests.get(LINKEDIN_SKILLS_URL, headers=headers, timeout=30)
-        
-        positions = positions_response.json().get('elements', []) if positions_response.ok else []
-        education = education_response.json().get('elements', []) if education_response.ok else []
-        skills = skills_response.json().get('elements', []) if skills_response.ok else []
-        
-        # Step 4: Transform data to CV format
+        # Step 3: Transform data to CV format
         cv_data = {
             'personalInfo': {
-                'fullName': f"{profile.get('localizedFirstName', '')} {profile.get('localizedLastName', '')}".strip(),
-                'email': email,
+                'fullName': userinfo.get('name', ''),
+                'email': userinfo.get('email', ''),
                 'phone': '',
-                'location': '',
-                'linkedin': f"https://www.linkedin.com/in/{profile.get('vanityName', '')}",
-                'summary': profile.get('headline', ''),
+                'location': userinfo.get('locale', {}).get('country', '') if isinstance(userinfo.get('locale'), dict) else '',
+                'linkedin': userinfo.get('sub', ''),  # LinkedIn profile ID
+                'summary': '',
+                'picture': userinfo.get('picture', ''),
             },
-            'experience': [
-                {
-                    'company': pos.get('company', {}).get('name', ''),
-                    'position': pos.get('title', ''),
-                    'startDate': format_linkedin_date(pos.get('timePeriod', {}).get('startDate')),
-                    'endDate': format_linkedin_date(pos.get('timePeriod', {}).get('endDate')),
-                    'current': not pos.get('timePeriod', {}).get('endDate'),
-                    'description': pos.get('description', ''),
-                }
-                for pos in positions
-            ],
-            'education': [
-                {
-                    'institution': edu.get('schoolName', ''),
-                    'degree': edu.get('degreeName', ''),
-                    'field': edu.get('fieldOfStudy', ''),
-                    'startDate': format_linkedin_date(edu.get('timePeriod', {}).get('startDate')),
-                    'endDate': format_linkedin_date(edu.get('timePeriod', {}).get('endDate')),
-                    'current': not edu.get('timePeriod', {}).get('endDate'),
-                }
-                for edu in education
-            ],
-            'skills': [
-                {
-                    'name': skill.get('name', ''),
-                    'level': 3,  # Default to intermediate level
-                }
-                for skill in skills
-            ],
+            'experience': [],  # OpenID Connect doesn't provide work experience
+            'education': [],   # OpenID Connect doesn't provide education
+            'skills': [],      # OpenID Connect doesn't provide skills
         }
         
         logger.info(f'Successfully imported LinkedIn data for user: {cv_data["personalInfo"]["fullName"]}')
