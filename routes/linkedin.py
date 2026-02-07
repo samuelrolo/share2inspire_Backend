@@ -5,8 +5,7 @@ Handles LinkedIn OAuth and profile data import
 
 import logging
 import requests
-from flask import Blueprint, request, jsonify
-from flask_cors import cross_origin
+from flask import Blueprint, request, jsonify, make_response
 from utils.secrets import get_secret
 
 logger = logging.getLogger(__name__)
@@ -23,13 +22,20 @@ LINKEDIN_SKILLS_URL = 'https://api.linkedin.com/v2/skills?q=members&projection=(
 
 
 @linkedin_bp.route('/import', methods=['POST', 'OPTIONS'])
-@cross_origin(origins='*', methods=['POST', 'OPTIONS'], allow_headers=['Content-Type', 'Authorization'])
 def import_linkedin_data():
     """
     Import user data from LinkedIn profile
     Expects: { "code": "authorization_code" }
     Returns: CV data in standardized format
     """
+    # Handle preflight OPTIONS request
+    if request.method == 'OPTIONS':
+        response = make_response('', 200)
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        return response
+    
     try:
         data = request.get_json()
         code = data.get('code')
