@@ -944,3 +944,112 @@ Investir nas melhorias identificadas representa um retorno significativo em term
         
         # Merge template com dados recebidos (dados recebidos têm prioridade)
         return merge_dicts(template, data)
+
+
+    def parse_for_cv_builder(self, file_stream, filename):
+        """
+        Extrai dados estruturados do CV para preencher o CV Builder.
+        Retorna informação pessoal, experiências, educação, skills, idiomas e certificações.
+        """
+        if not self.model:
+            return {"error": "Gemini model not available"}, 500
+        
+        try:
+            text = self.extract_text(file_stream, filename)
+            if not text:
+                return {"error": "Could not extract text from file"}, 400
+            
+            prompt = """Extrai TODOS os dados estruturados deste CV em formato JSON.
+
+IMPORTANTE - REGRAS:
+1. Extrai TODAS as experiências profissionais (não apenas a última)
+2. Extrai TODA a formação académica (não apenas a última)
+3. Extrai TODAS as competências/skills mencionadas
+4. Extrai TODOS os idiomas com níveis
+5. Extrai TODAS as certificações
+6. Para datas, usa formato "YYYY-MM" ou "YYYY" (se só tiver ano)
+7. Se ainda trabalha numa empresa, usa "current": true
+8. Se ainda estuda, usa "current": true
+
+Retorna APENAS um JSON válido (sem markdown) com esta estrutura:
+
+{
+    "personalInfo": {
+        "fullName": "Nome Completo",
+        "email": "email@example.com",
+        "phone": "+351 912 345 678",
+        "location": "Lisboa, Portugal",
+        "linkedin": "https://linkedin.com/in/username",
+        "summary": "Resumo profissional se existir no CV"
+    },
+    "experience": [
+        {
+            "company": "Nome da Empresa",
+            "position": "Cargo/Função",
+            "startDate": "2020-01",
+            "endDate": "2023-06",
+            "current": false,
+            "location": "Lisboa, Portugal",
+            "description": "Descrição das responsabilidades e conquistas"
+        }
+    ],
+    "education": [
+        {
+            "institution": "Nome da Instituição",
+            "degree": "Licenciatura/Mestrado/etc",
+            "field": "Área de Estudo",
+            "startDate": "2015-09",
+            "endDate": "2018-07",
+            "current": false,
+            "location": "Porto, Portugal"
+        }
+    ],
+    "skills": [
+        {
+            "name": "Nome da Competência",
+            "category": "Técnica/Comportamental/Idioma",
+            "level": "Básico/Intermédio/Avançado/Especialista"
+        }
+    ],
+    "languages": [
+        {
+            "language": "Português",
+            "proficiency": "Nativo",
+            "native": true
+        },
+        {
+            "language": "Inglês",
+            "proficiency": "Fluente/Avançado/Intermédio/Básico",
+            "native": false
+        }
+    ],
+    "certifications": [
+        {
+            "name": "Nome da Certificação",
+            "issuer": "Entidade Emissora",
+            "date": "2022-05",
+            "url": "URL se disponível"
+        }
+    ]
+}"""
+            
+            full_prompt = f"{prompt}\n\n--- CV PARA EXTRAÇÃO ---\n{text}"
+            
+            response = self.model.generate_content(full_prompt)
+            cleaned_text = response.text.strip()
+            
+            # Remover marcadores de código
+            if "```json" in cleaned_text:
+                cleaned_text = cleaned_text.split("```json")[1].split("```")[0]
+            elif "```" in cleaned_text:
+                cleaned_text = cleaned_text.split("```")[1].split("```")[0]
+            
+            cv_data = json.loads(cleaned_text)
+            return cv_data, 200
+            
+        except json.JSONDecodeError as e:
+            print(f"[ERRO] JSON inválido retornado pelo Gemini: {e}")
+            return {"error": "Failed to parse CV data", "details": str(e)}, 500
+        except Exception as e:
+            print(f"[ERRO] Parsing CV falhou: {e}")
+            return {"error": "Failed to parse CV", "details": str(e)}, 500
