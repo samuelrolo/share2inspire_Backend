@@ -6,6 +6,7 @@ Handles LinkedIn OAuth and profile data import
 import logging
 import requests
 from flask import Blueprint, request, jsonify
+from flask_cors import cross_origin
 from utils.secrets import get_secret
 
 logger = logging.getLogger(__name__)
@@ -21,7 +22,8 @@ LINKEDIN_EDUCATION_URL = 'https://api.linkedin.com/v2/educations?q=members&proje
 LINKEDIN_SKILLS_URL = 'https://api.linkedin.com/v2/skills?q=members&projection=(elements*(name))'
 
 
-@linkedin_bp.route('/import', methods=['POST'])
+@linkedin_bp.route('/import', methods=['POST', 'OPTIONS'])
+@cross_origin(origins='*', methods=['POST', 'OPTIONS'], allow_headers=['Content-Type', 'Authorization'])
 def import_linkedin_data():
     """
     Import user data from LinkedIn profile
