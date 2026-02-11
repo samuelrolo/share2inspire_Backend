@@ -15,6 +15,7 @@ from routes.services import services_bp
 from routes.analytics_routes import analytics_bp
 from routes.linkedin import linkedin_bp
 from routes.cv_parser import cv_parser_bp
+from routes.analyze import analyze_bp
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO)
@@ -65,6 +66,9 @@ app.register_blueprint(linkedin_bp, url_prefix='/api/linkedin')
 
 # /api/cv/...
 app.register_blueprint(cv_parser_bp, url_prefix='/api/cv')
+
+# /api/analyze/...
+app.register_blueprint(analyze_bp, url_prefix='/api/analyze')
 
 
 # === ROTAS DE SAÚDE ===
