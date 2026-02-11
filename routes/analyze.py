@@ -14,6 +14,53 @@ logger = logging.getLogger(__name__)
 analyze_bp = Blueprint('analyze', __name__)
 
 
+def transform_to_frontend_format(analysis_data):
+    """
+    Transform CVAnalyzer output to frontend expected format
+    Frontend expects: {atsRejectionRate, quadrants: [{title, score, benchmark, impactPhrase}]}
+    """
+    # Extract scores from analysis data
+    scores = analysis_data.get('scores', {})
+    
+    # Calculate ATS rejection rate (inverse of ATS compatibility)
+    ats_score = scores.get('ats_compatibility', 50)
+    ats_rejection_rate = 100 - ats_score
+    
+    # Build quadrants from dimensional scores
+    quadrants = [
+        {
+            'title': 'Estrutura',
+            'score': scores.get('structure', 60),
+            'benchmark': 74,
+            'impactPhrase': 'A estrutura do CV afeta a primeira impressão'
+        },
+        {
+            'title': 'Conteúdo',
+            'score': scores.get('content', 65),
+            'benchmark': 71,
+            'impactPhrase': 'O conteúdo demonstra valor e competências'
+        },
+        {
+            'title': 'Formação',
+            'score': scores.get('education', 70),
+            'benchmark': 68,
+            'impactPhrase': 'A formação valida a preparação técnica'
+        },
+        {
+            'title': 'Experiência',
+            'score': scores.get('experience', 55),
+            'benchmark': 69,
+            'impactPhrase': 'A experiência comprova a capacidade de execução'
+        }
+    ]
+    
+    return {
+        'atsRejectionRate': ats_rejection_rate,
+        'quadrants': quadrants,
+        'fullAnalysis': analysis_data  # Keep full data for paid report
+    }
+
+
 @analyze_bp.route('/free', methods=['POST', 'OPTIONS'])
 def analyze_free():
     """
@@ -55,8 +102,11 @@ def analyze_free():
         if not analysis_result:
             return jsonify({'error': 'Analysis failed'}), 500
         
+        # Transform to frontend format
+        frontend_data = transform_to_frontend_format(analysis_result)
+        
         logger.info(f'Successfully analyzed CV: {cv_data["filename"]}')
-        return jsonify(analysis_result), 200
+        return jsonify(frontend_data), 200
         
     except Exception as e:
         logger.error(f'CV analysis error: {str(e)}', exc_info=True)
