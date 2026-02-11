@@ -27,17 +27,10 @@ load_dotenv()
 # Criar aplicação Flask
 app = Flask(__name__)
 
-# Configuração CORS explícita para permitir domínios específicos
+# Configuração CORS - Permitir todos os domínios
 CORS(app, resources={
-    r"/api/*": {
-        "origins": [
-            "*",  # Allow all for development
-            "https://share2inspire.pt",
-            "https://www.share2inspire.pt",
-            "https://share2inspire-cv-analyser.vercel.app",
-            "https://cv-compass.vercel.app",
-            "https://cv-compass-*.vercel.app",  # Preview deployments
-        ],
+    r"/*": {
+        "origins": "*",
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
         "supports_credentials": False
