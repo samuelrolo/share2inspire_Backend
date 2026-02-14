@@ -110,7 +110,7 @@ def normalize_payment_data(data):
         normalized['orderId'] = f"ORDER-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
     
     if 'amount' not in normalized:
-        normalized['amount'] = "30.00"
+        normalized['amount'] = "2.99"
     
     # Formatar telefone
     if 'phone' in normalized:
@@ -125,7 +125,7 @@ def create_multibanco_payment(data):
         payload = {
             "mbKey": IFTHENPAY_MULTIBANCO_KEY,
             "orderId": data.get('orderId'),
-            "amount": str(data.get('amount', '30.00')),
+            "amount": str(data.get('amount', '2.99')),
             "description": data.get('description', 'Pagamento Share2Inspire'),
             "url": "https://share2inspire.pt/callback",
             "clientCode": "123",
@@ -186,7 +186,7 @@ def create_mbway_payment(data):
         payload = {
             "mbWayKey": IFTHENPAY_MBWAY_KEY,
             "orderId": data.get('orderId'),
-            "amount": str(data.get('amount', '30.00')),
+            "amount": str(data.get('amount', '2.99')),
             "mobileNumber": data.get('phone', ''),
             "email": data.get('email', ''),
             "description": data.get('description', 'Pagamento Share2Inspire')
@@ -318,7 +318,7 @@ def create_payshop_payment(data):
         payload = {
             "payshopKey": IFTHENPAY_PAYSHOP_KEY,
             "orderId": data.get('orderId'),
-            "amount": str(data.get('amount', '30.00')),
+            "amount": str(data.get('amount', '2.99')),
             "description": data.get('description', 'Pagamento Share2Inspire'),
             "url": "https://share2inspire.pt/callback",
             "clientCode": "123",
